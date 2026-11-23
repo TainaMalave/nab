@@ -27,7 +27,7 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add("Open Snapshots folder", null, (_, _) => OpenFolder());
         menu.Items.Add("Open capture log", null, (_, _) => OpenLog());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => ExitThread());
+        menu.Items.Add("Exit", null, (_, _) => { if (CloseEditors()) ExitThread(); });
 
         _tray = new NotifyIcon
         {
@@ -60,6 +60,24 @@ internal sealed class TrayApp : ApplicationContext
         return s != null ? new Icon(s, SystemInformation.SmallIconSize) : SystemIcons.Application;
     }
 
+    /// <summary>The app icon with all its sizes, for normal windows (the editor).</summary>
+    internal static Icon LoadAppIcon()
+    {
+        using var s = typeof(TrayApp).Assembly.GetManifestResourceStream("Snapshot.app.ico");
+        return s != null ? new Icon(s) : SystemIcons.Application;
+    }
+
+    /// <summary>Closes open editors (each asks about unsaved changes). False if the user cancelled one.</summary>
+    private static bool CloseEditors()
+    {
+        foreach (var f in Application.OpenForms.OfType<EditorForm>().ToArray()) f.Close();
+        return !Application.OpenForms.OfType<EditorForm>().Any();
+    }
+
+    /// <summary>appSettings "OpenEditorAfterCapture" (default false). Read once; restart Snapshot after changing.</summary>
+    private static readonly bool OpenEditorAfterCapture =
+        bool.TryParse(System.Configuration.ConfigurationManager.AppSettings["OpenEditorAfterCapture"]?.Trim(), out bool v) && v;
+
     // ---- capture flow -----------------------------------------------------------------------------
 
     private async Task CaptureRegionAsync(int delayMs)
@@ -71,14 +89,19 @@ internal sealed class TrayApp : ApplicationContext
             await HideThumbsAsync(delayMs);
             var vs = SystemInformation.VirtualScreen; // physical px (per-monitor v2), may have negative origin
             Bitmap? result = null;
+            Rectangle source = Rectangle.Empty;
             using (var screen = ScreenCapture.Grab(vs))
             using (var overlay = new RegionOverlay(screen, vs))
             {
                 if (overlay.ShowDialog() == DialogResult.OK)
+                {
                     result = screen.Clone(overlay.Selection, PixelFormat.Format24bppRgb);
+                    source = overlay.Selection;
+                    source.Offset(vs.Location); // overlay coords -> screen coords
+                }
             }
             ShowThumbs();
-            if (result != null) Deliver(result);
+            if (result != null) Deliver(result, source);
         }
         catch (Exception ex) { ShowThumbs(); Error(ex); }
         finally { _busy = false; }
@@ -96,7 +119,7 @@ internal sealed class TrayApp : ApplicationContext
             using (var raw = ScreenCapture.Grab(bounds))
                 shot = raw.Clone(new Rectangle(Point.Empty, raw.Size), PixelFormat.Format24bppRgb);
             ShowThumbs();
-            Deliver(shot);
+            Deliver(shot, bounds);
         }
         catch (Exception ex) { ShowThumbs(); Error(ex); }
         finally { _busy = false; }
@@ -116,23 +139,32 @@ internal sealed class TrayApp : ApplicationContext
         foreach (var t in _thumbs) if (!t.IsDisposed && !t.Visible) t.SetHidden(false);
     }
 
-    private void Deliver(Bitmap shot)
+    /// <param name="source">Where the capture was on screen (physical px), so the editor can open on that monitor.</param>
+    private void Deliver(Bitmap shot, Rectangle source)
     {
         string path = "";
         try { path = ScreenCapture.SavePng(shot); }
         catch (Exception ex) { Error(ex, "Couldn't save the PNG"); }
         try { ScreenCapture.CopyToClipboard(shot); }
         catch (Exception ex) { Error(ex, "Couldn't copy to the clipboard"); }
-        AddThumbnail(shot, path);
+
+        if (OpenEditorAfterCapture)
+        {
+            var editor = new EditorForm(shot, path, source); // the editor owns the bitmap now
+            editor.Show();
+            editor.Activate();
+            return;
+        }
+        AddThumbnail(shot, path, source);
     }
 
     // ---- thumbnail stack --------------------------------------------------------------------------
 
-    private void AddThumbnail(Bitmap shot, string path)
+    private void AddThumbnail(Bitmap shot, string path, Rectangle source)
     {
         var wa = Screen.PrimaryScreen!.WorkingArea;
         float s = Native.ScaleAt(new Point(wa.Right - 1, wa.Bottom - 1));
-        var thumb = new ThumbnailForm(shot, path, s);
+        var thumb = new ThumbnailForm(shot, path, source, s);
         thumb.FormClosed += (_, _) =>
         {
             _thumbs.Remove(thumb); // WinForms disposes a closed modeless form itself

@@ -7,16 +7,18 @@ namespace Snapshot;
 
 /// <summary>
 /// CleanShot-style floating preview. Topmost, never activates (so it never steals focus), no taskbar entry.
-/// Hover shows Copy / Save As / Folder / close; dragging it drops the PNG file into any app.
+/// Hover shows Edit / Copy / Save As / Folder / close; double-click also opens the editor; dragging it drops the
+/// PNG file into any app.
 /// Buttons are painted by hand (not WinForms Buttons) because focusing a child control would activate the window.
 /// </summary>
 internal sealed class ThumbnailForm : Form
 {
-    private enum Btn { None = -1, Copy, SaveAs, Folder, Close }
+    private enum Btn { None = -1, Edit, Copy, SaveAs, Folder, Close }
 
     private readonly Bitmap _image;      // full-size capture (owned)
     private readonly Bitmap _preview;    // pre-scaled to client size
     private readonly string _path;
+    private readonly Rectangle _source;  // where the capture was on screen: the editor opens on that monitor
     private readonly float _s;
     private readonly Font _font;
     private readonly System.Windows.Forms.Timer _dismiss = new() { Interval = 6000 };
@@ -28,10 +30,11 @@ internal sealed class ThumbnailForm : Form
     private Point? _dragStart;
     private string? _flash;
 
-    public ThumbnailForm(Bitmap image, string path, float scale)
+    public ThumbnailForm(Bitmap image, string path, Rectangle source, float scale)
     {
         _image = image;
         _path = path;
+        _source = source;
         _s = scale;
         _font = new Font("Segoe UI", 12f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
 
@@ -161,6 +164,12 @@ internal sealed class ThumbnailForm : Form
             Run(pressed);
     }
 
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        base.OnMouseDoubleClick(e);
+        if (e.Button == MouseButtons.Left && HitTest(e.Location) == Btn.None) Run(Btn.Edit);
+    }
+
     private Btn HitTest(Point p)
     {
         if (!_hover) return Btn.None;
@@ -190,6 +199,14 @@ internal sealed class ThumbnailForm : Form
         {
             switch (btn)
             {
+                case Btn.Edit:
+                    // The editor gets its own copy of the image; the thumbnail's job is done.
+                    var copy = _image.Clone(new Rectangle(Point.Empty, _image.Size), _image.PixelFormat);
+                    var editor = new EditorForm(copy, _path, _source);
+                    editor.Show();
+                    editor.Activate();
+                    Close();
+                    break;
                 case Btn.Copy:
                     ScreenCapture.CopyToClipboard(_image);
                     Flash("Copied");
@@ -258,23 +275,26 @@ internal sealed class ThumbnailForm : Form
 
     // ---- painting ---------------------------------------------------------------------------------
 
+    /// <summary>2×2 grid of equal-width buttons, centred: Edit / Copy on top, Save As / Folder below.</summary>
     private void LayoutButtons()
     {
         int h = (int)(26 * _s), gap = (int)(6 * _s), pad = (int)(12 * _s);
-        var btns = new[] { Btn.Copy, Btn.SaveAs, Btn.Folder };
-        var widths = btns.Select(b => TextRenderer.MeasureText(Label(b), _font).Width + 2 * pad).ToArray();
-        int total = widths.Sum() + gap * (btns.Length - 1);
-        int x = (ClientSize.Width - total) / 2, y = (ClientSize.Height - h) / 2;
-        for (int i = 0; i < btns.Length; i++)
-        {
-            _buttons[btns[i]] = new Rectangle(x, y, widths[i], h);
-            x += widths[i] + gap;
-        }
+        var grid = new[] { Btn.Edit, Btn.Copy, Btn.SaveAs, Btn.Folder };
+        int w = grid.Max(b => TextRenderer.MeasureText(Label(b), _font).Width + 2 * pad);
+        int x0 = (ClientSize.Width - (2 * w + gap)) / 2, y0 = (ClientSize.Height - (2 * h + gap)) / 2;
+        for (int i = 0; i < grid.Length; i++)
+            _buttons[grid[i]] = new Rectangle(x0 + (i % 2) * (w + gap), y0 + (i / 2) * (h + gap), w, h);
         int c = (int)(22 * _s), m = (int)(6 * _s);
         _buttons[Btn.Close] = new Rectangle(ClientSize.Width - c - m, m, c, c);
     }
 
-    private static string Label(Btn b) => b == Btn.Copy ? "Copy" : b == Btn.SaveAs ? "Save As" : "Folder";
+    private static string Label(Btn b) => b switch
+    {
+        Btn.Edit => "Edit",
+        Btn.Copy => "Copy",
+        Btn.SaveAs => "Save As",
+        _ => "Folder",
+    };
 
     protected override void OnPaint(PaintEventArgs e)
     {

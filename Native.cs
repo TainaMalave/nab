@@ -21,10 +21,14 @@ internal static class Native
 
     public static readonly IntPtr HWND_TOPMOST = new(-1);
     public static readonly IntPtr HWND_MESSAGE = new(-3);
-    public const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
+    public const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
 
+    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;  // Windows 10 20H1+ / 11
     public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33; // Windows 11+
     public const int DWMWCP_ROUND = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT { public int Left, Top, Right, Bottom; }
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

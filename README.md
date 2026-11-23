@@ -1,11 +1,11 @@
-# Snapshot (prototype v6)
+# Snapshot (prototype v7)
 
 A tiny CleanShot-style screenshot tool for Windows 10/11. It's one small `Snapshot.exe` (about 90 KB) built for .NET Framework 4.8, which ships with Windows 10 (1903+) and 11, so there's nothing to install. `Snapshot.exe.config` is optional: the exe runs without it.
 
 ## Run
 1. Double-click `Snapshot.exe`. If SmartScreen shows "Windows protected your PC" (the exe is unsigned), click **More info**, then **Run anyway**.
 2. A blue icon appears in the system tray (it may be under the `^` overflow arrow). No window opens.
-3. To quit, right-click the tray icon and choose **Exit**. To remove it, delete the exe. It writes no settings or registry entries.
+3. To quit, right-click the tray icon and choose **Exit**. To remove it, delete the exe. It writes no settings or registry entries (only your screenshots in `Pictures\Snapshots` and a small log in `%LOCALAPPDATA%\Snapshot`).
 
 ## Hotkeys
 | Action | Hotkey | Fallback if another app owns it |
@@ -26,9 +26,35 @@ The screen freezes and dims across all monitors. Drag a rectangle (the live size
 * A PNG is saved to `Pictures\Snapshots\Snapshot YYYY-MM-DD at HH.MM.SS.png`.
 * A **floating thumbnail** appears at the bottom-right. It never takes focus, so you can keep typing.
   * It disappears after about 6 seconds. Hovering keeps it open.
-  * On hover you get **Copy**, **Save As** (PNG or JPG), **Folder** (opens Explorer with the file selected), and **✕**.
+  * On hover you get **Edit**, **Copy**, **Save As** (PNG or JPG), **Folder** (opens Explorer with the file selected), and **✕**.
+  * **Double-click** the thumbnail (or click **Edit**) to open the annotation editor.
   * **Drag the thumbnail** into Slack, Discord, an email, a browser upload box, or an Explorer folder to drop the PNG file there.
   * New captures stack upward. If the stack gets too tall, the oldest is removed.
+
+## Annotation editor (new in v7)
+Opens on the monitor the screenshot came from, at 100% if it fits, otherwise zoomed to fit.
+
+| Tool | Key | Notes |
+|---|---|---|
+| Arrow | **A** | Drag. Hold **Shift** to snap to 45°. |
+| Rectangle | **R** | Drag. Hold **Shift** for a square. |
+| Ellipse | **E** | Drag. Hold **Shift** for a circle. |
+| Text | **T** | Click and type. **Enter** = new line, **Esc** or click elsewhere = finish. Click existing text to edit it. |
+
+* **Size:** three choices (keys **1**, **2**, **3**). Sets line thickness, or font size for text.
+* **Fill (F):** filled rectangles/ellipses, or a coloured background behind text (on by default for text, so it reads on busy screenshots).
+* **Colours:** red, yellow, green, blue, black, white, plus a custom colour picker. Changing colour, size, or fill while typing restyles that text.
+* The editor remembers your last tool, colour, size, and fill until Snapshot exits.
+* **Undo / redo:** Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z).
+* **Zoom:** Ctrl+mouse wheel, Ctrl+plus/minus, **Ctrl+1** = 100%, **Ctrl+0** = fit. Click the % in the toolbar to switch between them. Scroll with the wheel (Shift+wheel sideways); pan with the middle mouse button or **Space**+drag.
+* **Copy** (Ctrl+C) copies the annotated image.
+* **Save** (Ctrl+S) saves over the original PNG in `Pictures\Snapshots`.
+* **Save As** (Ctrl+Shift+S) writes a new PNG or JPG and leaves the original alone.
+* **Done** (Ctrl+Enter) saves over the original if anything changed, copies, and closes.
+* Closing with unsaved changes asks first. Exiting Snapshot from the tray also asks for each open editor.
+* On a narrow window (like a portrait monitor) the toolbar wraps onto two rows.
+
+To open the editor automatically after every capture (instead of showing the thumbnail), open `Snapshot.exe.config` in Notepad, set `OpenEditorAfterCapture` to `true`, and restart Snapshot. It's off by default.
 
 ## HDR displays (new in v3)
 With Windows HDR turned on, the classic GDI screen grab returns the desktop without tone mapping, so games (World of Warcraft, etc.) came out blown out and washed out.
@@ -61,7 +87,7 @@ Exclusive-fullscreen games can block or confuse desktop capture. If that happens
 ```
 dotnet build -c Release -o out      # .NET SDK; reference assemblies come from NuGet
 ```
-Output: `out/Snapshot.exe` (AnyCPU, runs 64-bit on x64). It only references Framework assemblies in the GAC (mscorlib, System, System.Core, System.Drawing, System.Windows.Forms).
+Output: `out/Snapshot.exe` (AnyCPU, runs 64-bit on x64). It only references Framework assemblies in the GAC (mscorlib, System, System.Core, System.Configuration, System.Drawing, System.Windows.Forms).
 DPI: Per-Monitor V2 is requested in `app.manifest`, with a `SetProcessDpiAwarenessContext` fallback in `Program.Main`.
 
 ## Code map
@@ -71,6 +97,8 @@ DPI: Per-Monitor V2 is requested in `app.manifest`, with a `SetProcessDpiAwarene
 * `HotkeyWindow.cs`: message-only window plus `RegisterHotKey`
 * `RegionOverlay.cs`: frozen and dimmed selection overlay
 * `ThumbnailForm.cs`: the non-activating floating preview, with hand-painted buttons and OLE file drag
+* `EditorForm.cs`: the annotation editor window (hand-painted toolbar, zoom/pan, text typing, undo, copy/save)
+* `Annotations.cs`: the annotation shapes (arrow, rectangle/ellipse, text) and how they draw
 * `ScreenCapture.cs`: screen grab, PNG save, clipboard
 * `CaptureLog.cs`: the diagnostic log
 * `HdrCapture.cs`: HDR monitors: DXGI Desktop Duplication (FP16) plus tone mapping to sRGB, with SDR white level from DisplayConfig
