@@ -2,7 +2,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>
 /// Full-virtual-screen overlay showing a frozen, dimmed copy of the desktop. The user drags a rectangle;

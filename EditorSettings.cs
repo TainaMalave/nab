@@ -1,22 +1,28 @@
 using System.Globalization;
 
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>
-/// The editor's last tool, colours, size and toggles, kept in %LOCALAPPDATA%\Snapshot\editor.ini so they survive a
+/// The editor's last tool, colours, size and toggles, kept in %LOCALAPPDATA%\nab\editor.ini so they survive a
 /// restart. Plain key=value lines. Reading or writing never throws: a missing or broken file just means defaults.
+/// If there's no nab file yet, the one from when the app was called Snapshot is read instead.
 /// </summary>
 internal static class EditorSettings
 {
     public static string FilePath => Path.Combine(CaptureLog.Folder, "editor.ini");
+
+    private static string OldFilePath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Snapshot", "editor.ini");
 
     public static Dictionary<string, string> Load()
     {
         var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            if (!File.Exists(FilePath)) return d;
-            foreach (var raw in File.ReadAllLines(FilePath))
+            string path = FilePath;
+            if (!File.Exists(path)) path = OldFilePath;
+            if (!File.Exists(path)) return d;
+            foreach (var raw in File.ReadAllLines(path))
             {
                 int eq = raw.IndexOf('=');
                 if (eq > 0) d[raw.Substring(0, eq).Trim()] = raw.Substring(eq + 1).Trim();

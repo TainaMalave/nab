@@ -1,11 +1,11 @@
 using System.Drawing.Imaging;
 
-namespace Snapshot;
+namespace Nab;
 
 internal static class ScreenCapture
 {
     public static string Folder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Snapshots");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "nab");
 
     /// <summary>Grabs a rectangle of the desktop in physical screen pixels.</summary>
     public static Bitmap Grab(Rectangle screenRect)
@@ -50,7 +50,7 @@ internal static class ScreenCapture
     public static string SavePng(Bitmap bmp)
     {
         Directory.CreateDirectory(Folder);
-        string stem = $"Snapshot {DateTime.Now:yyyy-MM-dd 'at' HH.mm.ss}";
+        string stem = $"nab {DateTime.Now:yyyy-MM-dd 'at' HH.mm.ss}";
         string path = Path.Combine(Folder, stem + ".png");
         for (int i = 2; File.Exists(path); i++)
             path = Path.Combine(Folder, $"{stem} ({i}).png");

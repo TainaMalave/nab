@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Drawing.Imaging;
 
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>Tray icon + hotkeys + capture flow + thumbnail stack. No main window.</summary>
 internal sealed class TrayApp : ApplicationContext
@@ -24,7 +24,7 @@ internal sealed class TrayApp : ApplicationContext
             { ShortcutKeyDisplayString = regionKeys });
         menu.Items.Add(new ToolStripMenuItem("Capture full screen", null, (_, _) => _ = CaptureFullAsync(250))
             { ShortcutKeyDisplayString = fullKeys });
-        menu.Items.Add("Open Snapshots folder", null, (_, _) => OpenFolder());
+        menu.Items.Add("Open screenshots folder", null, (_, _) => OpenFolder());
         menu.Items.Add("Open capture log", null, (_, _) => OpenLog());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => { if (CloseEditors()) ExitThread(); });
@@ -32,14 +32,14 @@ internal sealed class TrayApp : ApplicationContext
         _tray = new NotifyIcon
         {
             Icon = LoadIcon(),
-            Text = "Snapshot",
+            Text = "nab",
             ContextMenuStrip = menu,
             Visible = true,
         };
         _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) _ = CaptureRegionAsync(150); };
 
         bool ok = regionKeys != "" && fullKeys != "";
-        _tray.ShowBalloonTip(4000, "Snapshot is running",
+        _tray.ShowBalloonTip(4000, "nab is running",
             ok ? $"{regionKeys}: capture region\n{fullKeys}: capture screen"
                : "Some hotkeys are in use by another app. Use the tray icon menu instead.",
             ok ? ToolTipIcon.Info : ToolTipIcon.Warning);
@@ -56,14 +56,14 @@ internal sealed class TrayApp : ApplicationContext
 
     private static Icon LoadIcon()
     {
-        using var s = typeof(TrayApp).Assembly.GetManifestResourceStream("Snapshot.app.ico");
+        using var s = typeof(TrayApp).Assembly.GetManifestResourceStream("nab.app.ico");
         return s != null ? new Icon(s, SystemInformation.SmallIconSize) : SystemIcons.Application;
     }
 
     /// <summary>The app icon with all its sizes, for normal windows (the editor).</summary>
     internal static Icon LoadAppIcon()
     {
-        using var s = typeof(TrayApp).Assembly.GetManifestResourceStream("Snapshot.app.ico");
+        using var s = typeof(TrayApp).Assembly.GetManifestResourceStream("nab.app.ico");
         return s != null ? new Icon(s) : SystemIcons.Application;
     }
 
@@ -74,7 +74,7 @@ internal sealed class TrayApp : ApplicationContext
         return !Application.OpenForms.OfType<EditorForm>().Any();
     }
 
-    /// <summary>appSettings "OpenEditorAfterCapture" (default false). Read once; restart Snapshot after changing.</summary>
+    /// <summary>appSettings "OpenEditorAfterCapture" (default false). Read once; restart nab after changing.</summary>
     private static readonly bool OpenEditorAfterCapture =
         bool.TryParse(System.Configuration.ConfigurationManager.AppSettings["OpenEditorAfterCapture"]?.Trim(), out bool v) && v;
 

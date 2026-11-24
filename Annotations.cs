@@ -2,7 +2,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>
 /// One annotation, in image pixel coordinates. Committed annotations are never mutated (the undo history keeps

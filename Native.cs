@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 
 
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>Win32 interop used by the app. All signatures are x64-safe (IntPtr for handles).</summary>
 internal static class Native

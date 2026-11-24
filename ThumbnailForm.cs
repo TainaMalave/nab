@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>
 /// CleanShot-style floating preview. Topmost, never activates (so it never steals focus), no taskbar entry.

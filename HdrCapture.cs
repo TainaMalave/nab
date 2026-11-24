@@ -2,7 +2,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>
 /// HDR-aware capture. When Windows HDR is on, GDI (BitBlt) returns the desktop without tone mapping, so bright
@@ -386,7 +386,7 @@ internal static unsafe class HdrCapture
         return sign == 1 ? -v : v;
     }
 
-    /// <summary>"hue" (default) or "clip"; set with appSettings key HdrToneMap in Snapshot.exe.config.</summary>
+    /// <summary>"hue" (default) or "clip"; set with appSettings key HdrToneMap in nab.exe.config.</summary>
     public static string ToneMode
     {
         get

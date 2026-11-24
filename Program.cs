@@ -1,4 +1,4 @@
-namespace Snapshot;
+namespace Nab;
 
 internal static class Program
 {
@@ -12,11 +12,20 @@ internal static class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        using var mutex = new Mutex(true, @"Local\Snapshot.Prototype.SingleInstance", out bool isFirst);
+        using var mutex = new Mutex(true, @"Local\nab.SingleInstance", out bool isFirst);
         if (!isFirst)
         {
-            MessageBox.Show("Snapshot is already running. Look for its icon in the system tray.",
-                "Snapshot", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("nab is already running. Look for its icon in the system tray.",
+                "nab", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        // nab used to be called Snapshot. Running both would fight over the same hotkeys.
+        if (Mutex.TryOpenExisting(@"Local\Snapshot.Prototype.SingleInstance", out var old))
+        {
+            old.Dispose();
+            MessageBox.Show("The older Snapshot app is still running. Exit it from its tray icon, then start nab again.",
+                "nab", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 

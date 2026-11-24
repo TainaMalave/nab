@@ -1,12 +1,12 @@
-namespace Snapshot;
+namespace Nab;
 
-/// <summary>Small append-only diagnostic log at %LOCALAPPDATA%\Snapshot\capture.log (trimmed to ~256 KB).</summary>
+/// <summary>Small append-only diagnostic log at %LOCALAPPDATA%\nab\capture.log (trimmed to ~256 KB).</summary>
 internal static class CaptureLog
 {
     private const long MaxBytes = 256 * 1024;
 
     public static string Folder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Snapshot");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "nab");
 
     public static string FilePath => Path.Combine(Folder, "capture.log");
 

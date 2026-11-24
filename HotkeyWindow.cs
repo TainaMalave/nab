@@ -1,4 +1,4 @@
-namespace Snapshot;
+namespace Nab;
 
 /// <summary>Hidden message-only window that owns the global hotkeys and raises <see cref="Pressed"/>.</summary>
 internal sealed class HotkeyWindow : NativeWindow, IDisposable

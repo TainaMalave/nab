@@ -3,7 +3,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
-namespace Snapshot;
+namespace Nab;
 
 internal enum Tool { Select, Arrow, Rect, Ellipse, Highlighter, Text, Steps, Blur, Crop }
 
@@ -59,7 +59,7 @@ internal sealed class EditorForm : Form
 
     private readonly Bitmap _image;    // the capture (owned)
     private readonly Bitmap _display;  // 32bppPArgb copy, fast to draw
-    private string _path;              // the PNG in Pictures\Snapshots ("" if the original save failed)
+    private string _path;              // the PNG in Pictures\nab ("" if the original save failed)
     private readonly float _imgScale;  // DPI scale of the monitor the capture came from: sizes strokes and text
     private readonly List<State> _history;
     private int _index, _savedIndex;
@@ -214,7 +214,7 @@ internal sealed class EditorForm : Form
     private void UpdateTitle()
     {
         string name = _path.Length > 0 ? Path.GetFileName(_path) : "Screenshot";
-        Text = (Dirty ? "• " : "") + name + " — Snapshot";
+        Text = (Dirty ? "• " : "") + name + " — nab";
     }
 
     // ---- window ------------------------------------------------------------------------------------
@@ -264,7 +264,7 @@ internal sealed class EditorForm : Form
         if (_closeWithoutPrompt || e.Cancel) return;
         CommitText();
         if (!Dirty) return;
-        var answer = MessageBox.Show(this, "Save your changes to the screenshot before closing?", "Snapshot",
+        var answer = MessageBox.Show(this, "Save your changes to the screenshot before closing?", "nab",
             MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
         if (answer == DialogResult.Cancel || (answer == DialogResult.Yes && !Save()))
             e.Cancel = true;
@@ -1419,11 +1419,11 @@ internal sealed class EditorForm : Form
         try
         {
             if (!Dirty && _path.Length > 0 && File.Exists(_path)) return _path;
-            string dir = Path.Combine(Path.GetTempPath(), "Snapshot");
+            string dir = Path.Combine(Path.GetTempPath(), "nab");
             Directory.CreateDirectory(dir);
             foreach (var old in Directory.GetFiles(dir)) // tidy up drags from earlier days
                 try { if (File.GetLastWriteTime(old) < DateTime.Now.AddDays(-1)) File.Delete(old); } catch { }
-            string name = _path.Length > 0 ? Path.GetFileName(_path) : "Snapshot.png";
+            string name = _path.Length > 0 ? Path.GetFileName(_path) : "nab.png";
             string file = Path.Combine(dir, name);
             using var bmp = Flatten();
             try { bmp.Save(file, ImageFormat.Png); }
@@ -1863,7 +1863,7 @@ internal sealed class EditorForm : Form
         using var dlg = new SaveFileDialog
         {
             Title = "Save annotated screenshot as",
-            FileName = _path.Length > 0 ? Path.GetFileNameWithoutExtension(_path) + " (edited).png" : "Snapshot.png",
+            FileName = _path.Length > 0 ? Path.GetFileNameWithoutExtension(_path) + " (edited).png" : "nab.png",
             InitialDirectory = _path.Length > 0 ? Path.GetDirectoryName(_path) : ScreenCapture.Folder,
             Filter = "PNG image (*.png)|*.png|JPEG image (*.jpg)|*.jpg",
             DefaultExt = "png",
