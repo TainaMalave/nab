@@ -1,11 +1,11 @@
-# Snapshot (prototype v8)
+# Snapshot (prototype v9)
 
-A tiny CleanShot-style screenshot tool for Windows 10/11. It's one small `Snapshot.exe` (about 150 KB) built for .NET Framework 4.8, which ships with Windows 10 (1903+) and 11, so there's nothing to install. `Snapshot.exe.config` is optional: the exe runs without it.
+A tiny CleanShot-style screenshot tool for Windows 10/11. It's one small `Snapshot.exe` (about 160 KB) built for .NET Framework 4.8, which ships with Windows 10 (1903+) and 11, so there's nothing to install. `Snapshot.exe.config` is optional: the exe runs without it.
 
 ## Run
 1. Double-click `Snapshot.exe`. If SmartScreen shows "Windows protected your PC" (the exe is unsigned), click **More info**, then **Run anyway**.
 2. A blue icon appears in the system tray (it may be under the `^` overflow arrow). No window opens.
-3. To quit, right-click the tray icon and choose **Exit**. To remove it, delete the exe. It writes no registry entries; besides your screenshots in `Pictures\Snapshots`, it keeps a small log and the editor's last-used settings (`capture.log`, `editor.ini`) in `%LOCALAPPDATA%\Snapshot`.
+3. To quit, right-click the tray icon and choose **Exit**. To remove it, delete the exe. It writes no registry entries; besides your screenshots in `Pictures\Snapshots`, it keeps a small log and the editor's last-used settings (`capture.log`, `editor.ini`) in `%LOCALAPPDATA%\Snapshot`. Images dragged out of the editor are temporary copies in `%TEMP%\Snapshot`, cleared after a day.
 
 ## Hotkeys
 | Action | Hotkey | Fallback if another app owns it |
@@ -31,11 +31,12 @@ The screen freezes and dims across all monitors. Drag a rectangle (the live size
   * **Drag the thumbnail** into Slack, Discord, an email, a browser upload box, or an Explorer folder to drop the PNG file there.
   * New captures stack upward. If the stack gets too tall, the oldest is removed.
 
-## Annotation editor (v7, more tools in v8)
+## Annotation editor (v7, more tools in v8, editing and drag-out in v9)
 Opens on the monitor the screenshot came from, at 100% if it fits, otherwise zoomed to fit.
 
 | Tool | Key | Notes |
 |---|---|---|
+| Select | **V** | Click a shape to select it, then drag to move it. Rectangles, ellipses, blurs and highlighter strokes get 8 resize handles. Arrows get a handle at each end plus one in the middle: drag the middle to bend the arrow (back to the line makes it straight). **Arrow keys** nudge (Shift = 10 px), **Delete** removes, **double-click** text to edit it, **Esc** deselects. Changing colour, size or the F toggle restyles the selected shape. |
 | Arrow | **A** | Drag. Hold **Shift** to snap to 45°. Press **F** for **curved** arrows: the curve follows the arc you drag (a straight drag gets a gentle bend). |
 | Rectangle | **R** | Drag. Hold **Shift** for a square. **F** = filled. |
 | Ellipse | **E** | Drag. Hold **Shift** for a circle. **F** = filled. |
@@ -51,6 +52,7 @@ Opens on the monitor the screenshot came from, at 100% if it fits, otherwise zoo
 * The editor remembers your last tool, colours, size, and toggles, even after Snapshot restarts (saved in `%LOCALAPPDATA%\Snapshot\editor.ini`).
 * **Undo / redo:** Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z).
 * **Zoom:** Ctrl+mouse wheel, Ctrl+plus/minus, **Ctrl+1** = 100%, **Ctrl+0** = fit. Click the % in the toolbar to switch between them. Scroll with the wheel (Shift+wheel sideways); pan with the middle mouse button or **Space**+drag.
+* **Drag** (the toolbar button with the dots): drag it onto Slack, Discord, an email, a browser upload box or a folder to drop the annotated image as a PNG, like the thumbnail. If nothing changed since the last save it drops the original file; otherwise a copy with the same name.
 * **Copy** (Ctrl+C) copies the annotated image.
 * **Save** (Ctrl+S) saves over the original PNG in `Pictures\Snapshots`.
 * **Save As** (Ctrl+Shift+S) writes a new PNG or JPG and leaves the original alone.

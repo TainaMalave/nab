@@ -16,6 +16,37 @@ internal abstract class Annot
     /// <summary>Draws in image coordinates. Callers set the transform and SmoothingMode.AntiAlias.</summary>
     public abstract void Draw(Graphics g);
 
+    // ---- editing after drawing (Select tool). All of these return new objects; committed ones never change. ----
+
+    /// <summary>True if <paramref name="p"/> (image px) is on the visible part of the annotation, within <paramref name="tol"/>.</summary>
+    public abstract bool Hit(PointF p, float tol);
+    public abstract Annot Moved(float dx, float dy);
+    public abstract Annot WithColor(Color c);
+
+    /// <summary>Dashed frame shown around a selected annotation (null: arrows show only their point handles).</summary>
+    public virtual RectangleF? Frame => null;
+    /// <summary>True if the frame gets 8 resize handles.</summary>
+    public virtual bool Resizable => false;
+    public virtual Annot WithFrame(RectangleF r) => this;
+    /// <summary>Individual drag points (arrow ends and bend).</summary>
+    public virtual PointF[] PointHandles => Array.Empty<PointF>();
+    public virtual Annot WithPointHandle(int index, PointF p) => this;
+
+    protected static float DistToSegment(PointF p, PointF a, PointF b)
+    {
+        float dx = b.X - a.X, dy = b.Y - a.Y, len2 = dx * dx + dy * dy;
+        float t = len2 == 0 ? 0 : Math.Max(0, Math.Min(1, ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / len2));
+        return Dist(p, new PointF(a.X + t * dx, a.Y + t * dy));
+    }
+
+    protected static float DistToPolyline(PointF p, IReadOnlyList<PointF> pts)
+    {
+        if (pts.Count == 1) return Dist(p, pts[0]);
+        float best = float.MaxValue;
+        for (int i = 1; i < pts.Count; i++) best = Math.Min(best, DistToSegment(p, pts[i - 1], pts[i]));
+        return best;
+    }
+
     /// <summary>
     /// Draws a list the way it is saved: blur/pixelate first (they belong to the picture underneath), then
     /// everything else in order. Numbered steps are numbered 1, 2, 3… in list order, so they re-flow on undo.
@@ -102,6 +133,46 @@ internal sealed class ArrowAnnot : Annot
     }
 
     public float Length => Dist(From, To);
+
+    /// <summary>The middle of the arrow: the curve's apex (t = 0.5), or the midpoint of a straight arrow.</summary>
+    public PointF Apex => Control is PointF c
+        ? new PointF(0.25f * From.X + 0.5f * c.X + 0.25f * To.X, 0.25f * From.Y + 0.5f * c.Y + 0.25f * To.Y)
+        : new PointF((From.X + To.X) / 2, (From.Y + To.Y) / 2);
+
+    public override bool Hit(PointF p, float tol)
+    {
+        var pts = new List<PointF>();
+        if (Control is PointF c) for (int i = 0; i <= 32; i++) pts.Add(Q(c, i / 32f));
+        else { pts.Add(From); pts.Add(To); }
+        float head = Math.Min(Width * 3.2f + 6f, Math.Max(1, Length));
+        return DistToPolyline(p, pts) <= Width * 0.6f + tol || Dist(p, To) <= head * 0.7f + tol;
+    }
+
+    public override Annot Moved(float dx, float dy) => new ArrowAnnot(
+        new PointF(From.X + dx, From.Y + dy), new PointF(To.X + dx, To.Y + dy), Width, Color,
+        Control is PointF c ? new PointF(c.X + dx, c.Y + dy) : null);
+
+    public override Annot WithColor(Color c) => new ArrowAnnot(From, To, Width, c, Control);
+    public ArrowAnnot WithWidth(float w) => new(From, To, w, Color, Control);
+    public ArrowAnnot WithCurve(bool curved) =>
+        curved == (Control != null) ? this : new ArrowAnnot(From, To, Width, Color, curved ? CurveControl(From, To, Array.Empty<PointF>()) : null);
+
+    public override PointF[] PointHandles => new[] { From, To, Apex };
+
+    public override Annot WithPointHandle(int index, PointF p)
+    {
+        switch (index)
+        {
+            case 0: return new ArrowAnnot(p, To, Width, Color, Control);
+            case 1: return new ArrowAnnot(From, p, Width, Color, Control);
+            default:
+                // Dragging the middle bends the arrow so its curve passes through p; back near the line = straight.
+                var mid = new PointF((From.X + To.X) / 2, (From.Y + To.Y) / 2);
+                if (DistToSegment(p, From, To) < Math.Max(3f, Width * 0.5f) && Dist(p, mid) < Length * 0.25f)
+                    return new ArrowAnnot(From, To, Width, Color, null);
+                return new ArrowAnnot(From, To, Width, Color, new PointF(2 * p.X - mid.X, 2 * p.Y - mid.Y));
+        }
+    }
 
     /// <summary>
     /// Control point for a curved arrow from the path the mouse took: the curve's apex sits where the drag strayed
@@ -224,6 +295,40 @@ internal sealed class ShapeAnnot : Annot
         Rect = rect; Ellipse = ellipse; Filled = filled; Width = width;
     }
 
+    /// <summary>On the outline (or anywhere inside if filled).</summary>
+    public override bool Hit(PointF p, float tol)
+    {
+        float band = Width / 2 + tol;
+        if (Ellipse)
+        {
+            float a = Rect.Width / 2, b = Rect.Height / 2;
+            if (a < 0.5f || b < 0.5f) return false;
+            float nx = (p.X - (Rect.X + a)) / a, ny = (p.Y - (Rect.Y + b)) / b;
+            float r = (float)Math.Sqrt(nx * nx + ny * ny);
+            return Filled ? r <= 1 + band / Math.Min(a, b) : Math.Abs(r - 1) * Math.Min(a, b) <= band;
+        }
+        var outer = RectangleF.Inflate(Rect, band, band);
+        if (!outer.Contains(p)) return false;
+        if (Filled) return true;
+        var inner = RectangleF.Inflate(Rect, -band, -band);
+        return inner.Width <= 0 || inner.Height <= 0 || !inner.Contains(p);
+    }
+
+    /// <summary>Inside an outline-only shape: selectable, but only if nothing else is under the mouse.</summary>
+    public bool HitInside(PointF p) => Ellipse
+        ? Rect.Width > 0 && Rect.Height > 0 &&
+          Math.Pow((p.X - Rect.X - Rect.Width / 2) / (Rect.Width / 2), 2) + Math.Pow((p.Y - Rect.Y - Rect.Height / 2) / (Rect.Height / 2), 2) <= 1
+        : Rect.Contains(p);
+
+    public override Annot Moved(float dx, float dy) =>
+        new ShapeAnnot(new RectangleF(Rect.X + dx, Rect.Y + dy, Rect.Width, Rect.Height), Ellipse, Filled, Width, Color);
+    public override Annot WithColor(Color c) => new ShapeAnnot(Rect, Ellipse, Filled, Width, c);
+    public ShapeAnnot WithWidth(float w) => new(Rect, Ellipse, Filled, w, Color);
+    public ShapeAnnot WithFilled(bool f) => new(Rect, Ellipse, f, Width, Color);
+    public override RectangleF? Frame => Rect;
+    public override bool Resizable => true;
+    public override Annot WithFrame(RectangleF r) => new ShapeAnnot(r, Ellipse, Filled, Width, Color);
+
     public override void Draw(Graphics g)
     {
         if (Rect.Width < 0.5f || Rect.Height < 0.5f) return;
@@ -248,6 +353,31 @@ internal sealed class HighlightAnnot : Annot
     public HighlightAnnot(PointF[] points, float width, Color color) : base(color)
     {
         Points = points; Width = width;
+    }
+
+    private RectangleF PointBounds
+    {
+        get
+        {
+            float l = Points.Min(p => p.X), t = Points.Min(p => p.Y), r = Points.Max(p => p.X), b = Points.Max(p => p.Y);
+            return RectangleF.FromLTRB(l, t, r, b);
+        }
+    }
+
+    public override bool Hit(PointF p, float tol) => DistToPolyline(p, Points) <= Width / 2 + tol;
+    public override Annot Moved(float dx, float dy) =>
+        new HighlightAnnot(Points.Select(p => new PointF(p.X + dx, p.Y + dy)).ToArray(), Width, Color);
+    public override Annot WithColor(Color c) => new HighlightAnnot(Points, Width, c);
+    public HighlightAnnot WithWidth(float w) => new(Points, w, Color);
+    public override RectangleF? Frame => PointBounds;
+    public override bool Resizable => true;
+
+    /// <summary>Stretches the stroke from its current bounds to <paramref name="r"/>.</summary>
+    public override Annot WithFrame(RectangleF r)
+    {
+        var o = PointBounds;
+        float sx = o.Width > 0.01f ? r.Width / o.Width : 1, sy = o.Height > 0.01f ? r.Height / o.Height : 1;
+        return new HighlightAnnot(Points.Select(p => new PointF(r.X + (p.X - o.X) * sx, r.Y + (p.Y - o.Y) * sy)).ToArray(), Width, Color);
     }
 
     public override void Draw(Graphics g)
@@ -275,6 +405,12 @@ internal sealed class StepAnnot : Annot
     }
 
     public override void Draw(Graphics g) => Draw(g, 1);
+
+    public override bool Hit(PointF p, float tol) => Dist(p, Center) <= Diameter / 2 + tol;
+    public override Annot Moved(float dx, float dy) => new StepAnnot(new PointF(Center.X + dx, Center.Y + dy), Diameter, Color);
+    public override Annot WithColor(Color c) => new StepAnnot(Center, Diameter, c);
+    public StepAnnot WithDiameter(float d) => new(Center, d, Color);
+    public override RectangleF? Frame => new RectangleF(Center.X - Diameter / 2, Center.Y - Diameter / 2, Diameter, Diameter);
 
     public void Draw(Graphics g, int number)
     {
@@ -343,6 +479,27 @@ internal sealed class BlurAnnot : Annot, IDisposable
     }
 
     public void Dispose() => _patch?.Dispose();
+
+    /// <summary>False for a drag preview / moved copy whose pixels still need computing.</summary>
+    public bool HasPatch => _patch != null;
+
+    public override bool Hit(PointF p, float tol) => RectangleF.Inflate(Rect, tol, tol).Contains(p);
+    public override Annot Moved(float dx, float dy) =>
+        new BlurAnnot(new Rectangle(Rect.X + (int)Math.Round(dx), Rect.Y + (int)Math.Round(dy), Rect.Width, Rect.Height), Pixelate, Strength, null);
+    public override Annot WithColor(Color c) => this;
+    public override RectangleF? Frame => Rect;
+    public override bool Resizable => true;
+    public override Annot WithFrame(RectangleF r) => new BlurAnnot(
+        Rectangle.FromLTRB((int)Math.Floor(r.Left), (int)Math.Floor(r.Top), (int)Math.Ceiling(r.Right), (int)Math.Ceiling(r.Bottom)),
+        Pixelate, Strength, null);
+    public BlurAnnot Restyled(bool pixelate, float strength) => new(Rect, pixelate, strength, null);
+
+    /// <summary>The same blur with its pixels computed from <paramref name="source"/>, clipped to the picture.</summary>
+    public BlurAnnot? Realize(Bitmap source)
+    {
+        var r = Rectangle.Intersect(Rect, new Rectangle(Point.Empty, source.Size));
+        return r.Width < 2 || r.Height < 2 ? null : new BlurAnnot(r, Pixelate, Strength, source);
+    }
 
     private static Bitmap MakePatch(Bitmap source, Rectangle rect, bool pixelate, float strength)
     {
@@ -448,6 +605,13 @@ internal sealed class TextAnnot : Annot
     }
 
     public TextAnnot Clone() => new(Pos, Px, Pill, Color) { Text = Text };
+
+    public override bool Hit(PointF p, float tol) => RectangleF.Inflate(Box, tol, tol).Contains(p);
+    public override Annot Moved(float dx, float dy) => new TextAnnot(new PointF(Pos.X + dx, Pos.Y + dy), Px, Pill, Color) { Text = Text };
+    public override Annot WithColor(Color c) => new TextAnnot(Pos, Px, Pill, c) { Text = Text };
+    public TextAnnot WithPx(float px) => new(Pos, px, Pill, Color) { Text = Text };
+    public TextAnnot WithPill(bool pill) => new(Pos, Px, pill, Color) { Text = Text };
+    public override RectangleF? Frame => Box;
 
     public bool SameAs(TextAnnot o) =>
         o.Text == Text && o.Pos == Pos && o.Px == Px && o.Pill == Pill && o.Color.ToArgb() == Color.ToArgb();

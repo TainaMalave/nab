@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace Snapshot;
 
-internal enum Tool { Arrow, Rect, Ellipse, Highlighter, Text, Steps, Blur, Crop }
+internal enum Tool { Select, Arrow, Rect, Ellipse, Highlighter, Text, Steps, Blur, Crop }
 
 /// <summary>
 /// Annotation editor: arrow (straight or curved), rectangle, ellipse, highlighter, text, numbered steps,
@@ -72,6 +72,14 @@ internal sealed class EditorForm : Form
 
     // ---- interaction ---------------------------------------------------------------------------------
     private Annot? _draft;
+    // Select tool: the selected annotation (index in Current), and the drag that is moving/resizing it.
+    private int _selected = -1;
+    private Annot? _preview;           // what the selected annotation looks like mid-drag (not in history yet)
+    private Annot? _dragOriginal;
+    private PointF _dragStartImg;
+    private int _dragHandle = -2;      // -2 none, -1 move, 0..7 frame handle, 100+i point handle
+    private Point _pressPoint;         // where a toolbar button was pressed (for dragging the image out)
+    private Item? _dragOutItem;
     private PointF _dragFrom;
     private readonly List<PointF> _dragPath = new(); // mouse path of the current drag (highlighter, curved arrow)
     private Point? _cropFrom;
@@ -274,6 +282,7 @@ internal sealed class EditorForm : Form
         {
             foreach (var blur in _history.SelectMany(s => s.Annots).OfType<BlurAnnot>().Distinct()) blur.Dispose();
             (_draft as BlurAnnot)?.Dispose();
+            (_preview as BlurAnnot)?.Dispose();
             _tip.Dispose();
             _tipTimer.Dispose();
             _caretTimer.Dispose();
@@ -295,6 +304,7 @@ internal sealed class EditorForm : Form
         {
             Tip = () => tip, Icon = icon, On = () => s_tool == t, Click = () => SetTool(t),
         };
+        _items.Add(ToolItem(Tool.Select, "Select (V)  ·  drag to move, handles to resize, Delete to remove, double-click text to edit", IconSelect));
         _items.Add(ToolItem(Tool.Arrow, "Arrow (A)  ·  hold Shift for 45°  ·  F for curved", IconArrow));
         _items.Add(ToolItem(Tool.Rect, "Rectangle (R)  ·  hold Shift for a square", IconRect));
         _items.Add(ToolItem(Tool.Ellipse, "Ellipse (E)  ·  hold Shift for a circle", IconEllipse));
@@ -312,8 +322,8 @@ internal sealed class EditorForm : Form
             _items.Add(new Item
             {
                 Tip = () => $"{sizeNames[k]} ({k + 1})",
-                On = () => s_size == k,
-                Enabled = () => s_tool != Tool.Crop,
+                On = () => ShownSize == k,
+                Enabled = () => StyleTool is not (Tool.Crop or Tool.Select),
                 Click = () => SetSize(k),
                 Icon = (g, r, c) =>
                 {
@@ -325,7 +335,7 @@ internal sealed class EditorForm : Form
         }
         _items.Add(new Item
         {
-            Tip = () => s_tool switch
+            Tip = () => StyleTool switch
             {
                 Tool.Arrow => "Curved arrow (F)",
                 Tool.Text => "Text background (F)",
@@ -333,7 +343,7 @@ internal sealed class EditorForm : Form
                 _ => "Filled shapes (F)",
             },
             On = () => ToggleState,
-            Enabled = () => s_tool is Tool.Arrow or Tool.Rect or Tool.Ellipse or Tool.Text or Tool.Blur,
+            Enabled = () => StyleTool is Tool.Arrow or Tool.Rect or Tool.Ellipse or Tool.Text or Tool.Blur,
             Click = ToggleFill,
             Icon = IconToggle,
         });
@@ -348,7 +358,7 @@ internal sealed class EditorForm : Form
                 Tip = () => "Colour",
                 On = () => s_color.ToArgb() == c.ToArgb(),
                 Click = () => SetColor(c),
-                Icon = (g, r, _) => DrawSwatch(g, r, c, s_color.ToArgb() == c.ToArgb(), false),
+                Icon = (g, r, _) => DrawSwatch(g, r, c, ShownColor.ToArgb() == c.ToArgb(), false),
             });
         }
         _items.Add(new Item
@@ -369,21 +379,72 @@ internal sealed class EditorForm : Form
         });
         _items.Add(new Item { Tip = () => "Undo (Ctrl+Z)", Icon = (g, r, c) => IconUndo(g, r, c, false), Enabled = () => _index > 0 || _editing != null, Click = Undo });
         _items.Add(new Item { Tip = () => "Redo (Ctrl+Y)", Icon = (g, r, c) => IconUndo(g, r, c, true), Enabled = () => _index < _history.Count - 1, Click = Redo });
+        _dragOutItem = new Item
+        {
+            Tip = () => "Drag this onto Slack, Discord, an email or a folder to drop the image",
+            Label = () => "Drag",
+            Icon = IconGrip,
+            Click = () => ShowToast("Drag the button onto another app"),
+        };
+        _items.Add(_dragOutItem);
         _items.Add(new Item { Tip = () => "Copy to clipboard (Ctrl+C)", Label = () => "Copy", Click = () => Copy() });
         _items.Add(new Item { Tip = () => "Save over the original PNG (Ctrl+S)", Label = () => "Save", Click = () => Save() });
         _items.Add(new Item { Tip = () => "Save a new file (Ctrl+Shift+S)", Label = () => "Save As", Click = SaveAs });
         _items.Add(new Item { Tip = () => "Save, copy and close (Ctrl+Enter)", Label = () => "Done", Primary = true, Click = Done });
     }
 
-    private bool IsCustomColor => !Presets.Any(p => p.ToArgb() == s_color.ToArgb());
+    private bool IsCustomColor => !Presets.Any(p => p.ToArgb() == ShownColor.ToArgb());
 
-    /// <summary>The F toggle means something different per tool.</summary>
-    private static bool ToggleState => s_tool switch
+    private Annot? SelectedAnnot => _selected >= 0 && _selected < Current.Count ? Current[_selected] : null;
+
+    /// <summary>The tool whose options the toolbar shows: the selected annotation's kind, else the current tool.</summary>
+    private Tool StyleTool => SelectedAnnot switch
     {
-        Tool.Arrow => s_curvedArrow,
-        Tool.Text => s_textPill,
-        Tool.Blur => s_pixelate,
-        Tool.Rect or Tool.Ellipse => s_fillShapes,
+        ArrowAnnot => Tool.Arrow,
+        ShapeAnnot s => s.Ellipse ? Tool.Ellipse : Tool.Rect,
+        HighlightAnnot => Tool.Highlighter,
+        TextAnnot => Tool.Text,
+        StepAnnot => Tool.Steps,
+        BlurAnnot => Tool.Blur,
+        _ => s_tool,
+    };
+
+    private Color ShownColor => SelectedAnnot is Annot a and not BlurAnnot ? a.Color : s_color;
+
+    private int ShownSize
+    {
+        get
+        {
+            int Find(float[] sizes, float v) => Array.FindIndex(sizes, s => Math.Abs(s * _imgScale - v) < 0.01f);
+            int k = SelectedAnnot switch
+            {
+                ArrowAnnot a => Find(StrokeSizes, a.Width),
+                ShapeAnnot s => Find(StrokeSizes, s.Width),
+                HighlightAnnot h => Find(HighlightSizes, h.Width),
+                StepAnnot st => Find(StepSizes, st.Diameter),
+                TextAnnot t => Find(TextSizes, t.Px),
+                BlurAnnot b => Find(b.Pixelate ? PixelSizes : BlurSizes, b.Strength),
+                _ => s_size,
+            };
+            return k;
+        }
+    }
+
+    /// <summary>The F toggle means something different per tool (or per selected annotation).</summary>
+    private bool ToggleState => SelectedAnnot switch
+    {
+        ArrowAnnot a => a.Control != null,
+        ShapeAnnot s => s.Filled,
+        TextAnnot t => t.Pill,
+        BlurAnnot b => b.Pixelate,
+        null => s_tool switch
+        {
+            Tool.Arrow => s_curvedArrow,
+            Tool.Text => s_textPill,
+            Tool.Blur => s_pixelate,
+            Tool.Rect or Tool.Ellipse => s_fillShapes,
+            _ => false,
+        },
         _ => false,
     };
 
@@ -403,7 +464,8 @@ internal sealed class EditorForm : Form
             if (it.Swatch) return swatchW;
             if (it.Label == null) return iconW;
             string text = it.Label().EndsWith("%") ? "1600%" : it.Label(); // zoom label: room for the widest value
-            return Math.Max(TextRenderer.MeasureText(text, _uiFont).Width + 2 * padX, iconW);
+            int extra = it.Icon != null ? (int)(14 * _s) : 0; // room for the icon left of the label
+            return Math.Max(TextRenderer.MeasureText(text, _uiFont).Width + 2 * padX + extra, iconW);
         }
 
         var groups = new List<List<Item>> { new() };
@@ -478,7 +540,8 @@ internal sealed class EditorForm : Form
             }
             if (it.Icon != null) it.Icon(g, r, fg);
             if (it.Label != null)
-                TextRenderer.DrawText(g, it.Label(), _uiFont, r, fg,
+                TextRenderer.DrawText(g, it.Label(), _uiFont,
+                    it.Icon != null ? Rectangle.FromLTRB(r.Left + (int)(14 * _s), r.Top, r.Right, r.Bottom) : r, fg,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
         }
         g.SmoothingMode = SmoothingMode.None;
@@ -503,6 +566,31 @@ internal sealed class EditorForm : Form
             g.DrawBezier(p, b.Left + 2 * _s, b.Bottom - 2 * _s, b.Left + 2 * _s, b.Top + 4 * _s, b.Left + 8 * _s, b.Top + 2 * _s, b.Right - 2 * _s, b.Top + 2 * _s);
         else
             g.DrawLine(p, b.Left + 2 * _s, b.Bottom - 2 * _s, b.Right - 2 * _s, b.Top + 2 * _s);
+    }
+
+    private void IconSelect(Graphics g, Rectangle r, Color c)
+    {
+        var b = IconBox(r);
+        float x = b.Left + 4 * _s, y = b.Top + 1 * _s, k = _s;
+        var pts = new[]
+        {
+            new PointF(x, y), new PointF(x, y + 14 * k), new PointF(x + 3.6f * k, y + 10.6f * k),
+            new PointF(x + 6.2f * k, y + 16 * k), new PointF(x + 8.4f * k, y + 15 * k),
+            new PointF(x + 5.9f * k, y + 9.8f * k), new PointF(x + 10.4f * k, y + 9.8f * k),
+        };
+        using var p = IconPen(c);
+        p.Width = 1.5f * _s;
+        g.DrawPolygon(p, pts);
+    }
+
+    private void IconGrip(Graphics g, Rectangle r, Color c)
+    {
+        // Six dots on the left of the "Drag" label.
+        using var b = new SolidBrush(c);
+        float d = 2.6f * _s, x0 = r.Left + 9 * _s, y0 = r.Top + r.Height / 2f - 5 * _s;
+        for (int row = 0; row < 3; row++)
+        for (int col = 0; col < 2; col++)
+            g.FillEllipse(b, x0 + col * 4.2f * _s, y0 + row * 4.2f * _s, d, d);
     }
 
     private void IconRect(Graphics g, Rectangle r, Color c)
@@ -586,14 +674,14 @@ internal sealed class EditorForm : Form
     private void IconToggle(Graphics g, Rectangle r, Color c)
     {
         var b = IconBox(r);
-        if (s_tool == Tool.Arrow)
+        if (StyleTool == Tool.Arrow)
         {
             using var p = IconPen(c);
             p.CustomEndCap = new AdjustableArrowCap(3.2f, 3.2f, true);
             g.DrawArc(p, new RectangleF(b.Left + 1 * _s, b.Top + 4 * _s, b.Width - 2 * _s, b.Height * 1.3f), 200, 140);
             return;
         }
-        if (s_tool == Tool.Blur)
+        if (StyleTool == Tool.Blur)
         {
             float cell = b.Width / 3f;
             for (int y = 0; y < 3; y++)
@@ -672,15 +760,55 @@ internal sealed class EditorForm : Form
         s_tool = t;
         _cropFrom = null;
         _cropDrag = null;
+        if (t != Tool.Select) Deselect();
         if (viewChanges) ViewChanged(); // the canvas shows the whole picture while cropping
         UpdateCursor(PointToClient(Cursor.Position));
         Invalidate();
+    }
+
+    private void Deselect()
+    {
+        _selected = -1;
+        _dragHandle = -2;
+        _dragOriginal = null;
+        SetPreview(null);
+        Invalidate();
+    }
+
+    /// <summary>Replaces the drag preview, freeing the old one's blur pixels.</summary>
+    private void SetPreview(Annot? p)
+    {
+        if (!ReferenceEquals(_preview, p)) (_preview as BlurAnnot)?.Dispose();
+        _preview = p;
+    }
+
+    /// <summary>Applies a style change to the selected annotation as one undo step.</summary>
+    private void Restyle(Func<Annot, Annot?> change)
+    {
+        var sel = SelectedAnnot;
+        if (sel == null || _editing != null) return;
+        var next = change(sel);
+        if (next == null || ReferenceEquals(next, sel)) return;
+        if (next is BlurAnnot b && !b.HasPatch && b.Realize(_image) is BlurAnnot real) next = real;
+        var list = Current.ToList();
+        list[_selected] = next;
+        Push(list);
     }
 
     private void SetSize(int k)
     {
         s_size = k;
         if (_editing != null) { _editing.Px = TextSizes[k] * _imgScale; }
+        else Restyle(a => a switch
+        {
+            ArrowAnnot x => x.WithWidth(StrokeSizes[k] * _imgScale),
+            ShapeAnnot x => x.WithWidth(StrokeSizes[k] * _imgScale),
+            HighlightAnnot x => x.WithWidth(HighlightSizes[k] * _imgScale),
+            StepAnnot x => x.WithDiameter(StepSizes[k] * _imgScale),
+            TextAnnot x => x.WithPx(TextSizes[k] * _imgScale),
+            BlurAnnot x => x.Restyled(x.Pixelate, (x.Pixelate ? PixelSizes : BlurSizes)[k] * _imgScale),
+            _ => null,
+        });
         Invalidate();
     }
 
@@ -688,11 +816,27 @@ internal sealed class EditorForm : Form
     {
         s_color = c;
         if (_editing != null) _editing.Color = c;
+        else Restyle(a => a is BlurAnnot ? null : a.WithColor(c));
         Invalidate();
     }
 
     private void ToggleFill()
     {
+        if (_editing == null && SelectedAnnot is Annot sel)
+        {
+            // Flip the selected annotation, and remember the choice for the next one of its kind.
+            int k = Math.Max(0, ShownSize);
+            Restyle(a => a switch
+            {
+                ArrowAnnot x => x.WithCurve(s_curvedArrow = x.Control == null),
+                ShapeAnnot x => x.WithFilled(s_fillShapes = !x.Filled),
+                TextAnnot x => x.WithPill(s_textPill = !x.Pill),
+                BlurAnnot x => x.Restyled(s_pixelate = !x.Pixelate, (!x.Pixelate ? PixelSizes : BlurSizes)[k] * _imgScale),
+                _ => null,
+            });
+            Invalidate();
+            return;
+        }
         switch (s_tool)
         {
             case Tool.Arrow: s_curvedArrow = !s_curvedArrow; break;
@@ -733,14 +877,26 @@ internal sealed class EditorForm : Form
     private void Undo()
     {
         CommitText();
-        if (_index > 0) { _index--; UpdateTitle(); ViewChanged(); }
+        if (_index > 0) { _index--; Deselect(); UpdateTitle(); ViewChanged(); }
     }
 
     private void Redo()
     {
         CommitText();
-        if (_index < _history.Count - 1) { _index++; UpdateTitle(); ViewChanged(); }
+        if (_index < _history.Count - 1) { _index++; Deselect(); UpdateTitle(); ViewChanged(); }
     }
+
+    /// <summary>Delete or nudge the selected annotation (one undo step each).</summary>
+    private void RemoveSelected()
+    {
+        if (SelectedAnnot == null) return;
+        var list = Current.ToList();
+        list.RemoveAt(_selected);
+        _selected = -1;
+        Push(list);
+    }
+
+    private void NudgeSelected(float dx, float dy) => Restyle(a => a.Moved(dx, dy));
 
     // ---- text editing ------------------------------------------------------------------------------
 
@@ -879,10 +1035,23 @@ internal sealed class EditorForm : Form
                 case Keys.OemMinus: case Keys.Subtract: ZoomStep(-1, Center()); return true;
             }
         }
+        if (_editing == null && SelectedAnnot != null && _dragHandle == -2 && (mods == Keys.None || mods == Keys.Shift))
+        {
+            float step = (mods == Keys.Shift ? 10 : 1) * Math.Max(1f, _imgScale);
+            switch (key)
+            {
+                case Keys.Left: NudgeSelected(-step, 0); return true;
+                case Keys.Right: NudgeSelected(step, 0); return true;
+                case Keys.Up: NudgeSelected(0, -step); return true;
+                case Keys.Down: NudgeSelected(0, step); return true;
+                case Keys.Delete: case Keys.Back: RemoveSelected(); return true;
+            }
+        }
         if (mods == Keys.None && _editing == null)
         {
             switch (key)
             {
+                case Keys.V: SetTool(Tool.Select); return true;
                 case Keys.A: SetTool(Tool.Arrow); return true;
                 case Keys.R: SetTool(Tool.Rect); return true;
                 case Keys.E: SetTool(Tool.Ellipse); return true;
@@ -903,7 +1072,8 @@ internal sealed class EditorForm : Form
                     SetTool(Tool.Crop); // leave crop mode
                     return true;
                 case Keys.Escape:
-                    if (_draft != null || _cropFrom != null) CancelDrag();
+                    if (_draft != null || _cropFrom != null || _dragHandle != -2) CancelDrag();
+                    else if (SelectedAnnot != null) Deselect();
                     else if (s_tool == Tool.Crop) SetTool(Tool.Crop); // leave crop mode
                     else Close();
                     return true;
@@ -924,6 +1094,9 @@ internal sealed class EditorForm : Form
         _draft = null;
         _cropFrom = null;
         _cropDrag = null;
+        _dragHandle = -2;          // a move/resize in progress snaps back
+        _dragOriginal = null;
+        SetPreview(null);
         Capture = false;
         Invalidate();
     }
@@ -943,6 +1116,7 @@ internal sealed class EditorForm : Form
         _tip.Hide(this);
         _tipTimer.Stop();
 
+        _pressPoint = e.Location;
         if (e.Y < BarH)
         {
             if (e.Button == MouseButtons.Left) { _pressed = ItemAt(e.Location); }
@@ -976,6 +1150,27 @@ internal sealed class EditorForm : Form
             case Tool.Crop:
                 _cropFrom = ClampToImage(pt);
                 _cropDrag = null;
+                return;
+
+            case Tool.Select:
+                if (_editing != null)
+                {
+                    if (_editing.Box.Contains(pt)) { _caret = _editing.HitIndex(pt); StartCaret(); return; }
+                    CommitText();
+                }
+                int handle = HandleAt(e.Location);
+                if (handle == -2)
+                {
+                    int hit = AnnotAt(pt);
+                    if (hit < 0) { Deselect(); return; }
+                    _selected = hit;
+                    handle = -1; // move
+                }
+                _dragHandle = handle;
+                _dragOriginal = SelectedAnnot;
+                _dragStartImg = pt;
+                SetPreview(null);
+                Invalidate();
                 return;
 
             default:
@@ -1015,6 +1210,33 @@ internal sealed class EditorForm : Form
             Invalidate(CanvasRect);
             return;
         }
+        if (_dragHandle != -2 && _dragOriginal != null && e.Button == MouseButtons.Left)
+        {
+            // Ignore the first couple of pixels so a click just selects.
+            if (_preview == null && Math.Abs(e.X - _pressPoint.X) < 3 && Math.Abs(e.Y - _pressPoint.Y) < 3) return;
+            var pt = ToImage(e.Location);
+            Annot next = _dragHandle switch
+            {
+                -1 => _dragOriginal.Moved(pt.X - _dragStartImg.X, pt.Y - _dragStartImg.Y),
+                >= 100 => _dragOriginal.WithPointHandle(_dragHandle - 100, pt),
+                _ => _dragOriginal.WithFrame(ResizeFrame(_dragOriginal.Frame!.Value, _dragHandle, pt)),
+            };
+            // Keep private info hidden while a blur moves (skip for very large areas to stay smooth).
+            if (next is BlurAnnot b && b.Rect.Width * b.Rect.Height <= 400_000) next = b.Realize(_image) ?? next;
+            SetPreview(next);
+            Invalidate(CanvasRect);
+            return;
+        }
+        if (_pressed != null && _pressed == _dragOutItem && e.Button == MouseButtons.Left)
+        {
+            var ds = SystemInformation.DragSize;
+            if (Math.Abs(e.X - _pressPoint.X) > ds.Width || Math.Abs(e.Y - _pressPoint.Y) > ds.Height)
+            {
+                _pressed = null;
+                StartDragOut();
+                return;
+            }
+        }
 
         var hot = _pressed == null ? ItemAt(e.Location) : _pressed;
         if (hot != null && !hot.Enabled()) hot = null;
@@ -1044,6 +1266,24 @@ internal sealed class EditorForm : Form
                 catch (Exception ex) { Debug.WriteLine(ex); ShowToast("Failed"); }
             }
             Invalidate();
+            return;
+        }
+
+        if (_dragHandle != -2 && e.Button == MouseButtons.Left)
+        {
+            var next = _preview;
+            _preview = null; // handed to the history below (not disposed)
+            _dragHandle = -2;
+            _dragOriginal = null;
+            if (next is BlurAnnot b && !b.HasPatch) next = b.Realize(_image); // null if dragged off the picture
+            if (next != null && SelectedAnnot != null)
+            {
+                var list = Current.ToList();
+                list[_selected] = next;
+                Push(list);
+            }
+            Invalidate();
+            UpdateCursor(e.Location);
             return;
         }
 
@@ -1081,6 +1321,123 @@ internal sealed class EditorForm : Form
             };
             if (keep != null) Push(Current.Append(keep).ToList());
             else Invalidate();
+        }
+    }
+
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        base.OnMouseDoubleClick(e);
+        // Select tool: double-click text to edit it.
+        if (s_tool != Tool.Select || e.Button != MouseButtons.Left || e.Y < BarH || _editing != null) return;
+        var pt = ToImage(e.Location);
+        if (SelectedAnnot is TextAnnot t && t.Hit(pt, 4 / _zoom))
+        {
+            SetPreview(null);
+            _dragHandle = -2;
+            _dragOriginal = null;
+            BeginEdit(_selected);
+            _caret = _editing!.HitIndex(pt);
+        }
+    }
+
+    // ---- selection helpers -------------------------------------------------------------------------
+
+    /// <summary>Topmost annotation under an image point: outlines and solid things first, then the inside of
+    /// outline-only shapes, then blurs (they sit underneath everything).</summary>
+    private int AnnotAt(PointF pt)
+    {
+        float tol = 5 / _zoom;
+        for (int i = Current.Count - 1; i >= 0; i--)
+            if (Current[i] is not BlurAnnot && Current[i].Hit(pt, tol)) return i;
+        for (int i = Current.Count - 1; i >= 0; i--)
+            if (Current[i] is ShapeAnnot s && !s.Filled && s.HitInside(pt)) return i;
+        for (int i = Current.Count - 1; i >= 0; i--)
+            if (Current[i] is BlurAnnot b && b.Hit(pt, 0)) return i;
+        return -1;
+    }
+
+    private static PointF[] FrameHandles(RectangleF f)
+    {
+        float cx = f.Left + f.Width / 2, cy = f.Top + f.Height / 2;
+        return new[]
+        {
+            new PointF(f.Left, f.Top), new PointF(cx, f.Top), new PointF(f.Right, f.Top), new PointF(f.Right, cy),
+            new PointF(f.Right, f.Bottom), new PointF(cx, f.Bottom), new PointF(f.Left, f.Bottom), new PointF(f.Left, cy),
+        };
+    }
+
+    /// <summary>Which handle of the selected annotation is under a client point: 100+i point handle, 0..7 frame
+    /// handle, -2 none.</summary>
+    private int HandleAt(Point client)
+    {
+        if (s_tool != Tool.Select || SelectedAnnot is not Annot a || _editing != null) return -2;
+        float reach = 7 * _s;
+        var pts = a.PointHandles;
+        for (int i = 0; i < pts.Length; i++)
+            if (Distance(ToClient(pts[i]), client) <= reach) return 100 + i;
+        if (a.Resizable && a.Frame is RectangleF f)
+        {
+            var hs = FrameHandles(f);
+            for (int i = 0; i < hs.Length; i++)
+                if (Distance(ToClient(hs[i]), client) <= reach) return i;
+        }
+        return -2;
+    }
+
+    private static float Distance(PointF a, Point b) => (float)Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+
+    /// <summary>Drag a frame handle (0 top-left, clockwise to 7 left) to <paramref name="p"/>; dragging past the
+    /// opposite edge flips instead of breaking.</summary>
+    private static RectangleF ResizeFrame(RectangleF r, int handle, PointF p)
+    {
+        float l = r.Left, t = r.Top, rr = r.Right, b = r.Bottom;
+        if (handle is 0 or 6 or 7) l = p.X;
+        if (handle is 2 or 3 or 4) rr = p.X;
+        if (handle is 0 or 1 or 2) t = p.Y;
+        if (handle is 4 or 5 or 6) b = p.Y;
+        return RectangleF.FromLTRB(Math.Min(l, rr), Math.Min(t, b), Math.Max(l, rr), Math.Max(t, b));
+    }
+
+    // ---- drag the image out ------------------------------------------------------------------------
+
+    /// <summary>OLE file drag of the current image, like the thumbnail: drop it into Slack, Discord, a folder…</summary>
+    private void StartDragOut()
+    {
+        CommitText();
+        string? file = DragFile();
+        if (file == null) { ShowToast("Failed"); return; }
+        var data = new DataObject();
+        data.SetFileDropList(new System.Collections.Specialized.StringCollection { file });
+        var effect = DoDragDrop(data, DragDropEffects.Copy);
+        Invalidate();
+        if (effect != DragDropEffects.None) ShowToast("Dropped");
+    }
+
+    /// <summary>The original PNG if it already matches what's on screen; otherwise a temp PNG with the same name.</summary>
+    private string? DragFile()
+    {
+        try
+        {
+            if (!Dirty && _path.Length > 0 && File.Exists(_path)) return _path;
+            string dir = Path.Combine(Path.GetTempPath(), "Snapshot");
+            Directory.CreateDirectory(dir);
+            foreach (var old in Directory.GetFiles(dir)) // tidy up drags from earlier days
+                try { if (File.GetLastWriteTime(old) < DateTime.Now.AddDays(-1)) File.Delete(old); } catch { }
+            string name = _path.Length > 0 ? Path.GetFileName(_path) : "Snapshot.png";
+            string file = Path.Combine(dir, name);
+            using var bmp = Flatten();
+            try { bmp.Save(file, ImageFormat.Png); }
+            catch (Exception) // still locked by an app that received the previous drop
+            {
+                file = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(name)} ({DateTime.Now:HHmmss}).png");
+                bmp.Save(file, ImageFormat.Png);
+            }
+            return file;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(ex);
+            return null;
         }
     }
 
@@ -1123,8 +1480,25 @@ internal sealed class EditorForm : Form
         else if (p.Y < BarH) c = ItemAt(p) is Item it && it.Enabled() ? Cursors.Hand : Cursors.Default;
         else if (_spaceDown) c = Cursors.Hand;
         else if (s_tool == Tool.Text) c = Cursors.IBeam;
+        else if (s_tool == Tool.Select) c = SelectCursor(p);
         else c = Cursors.Cross;
         if (Cursor != c) Cursor = c;
+    }
+
+    private Cursor SelectCursor(Point p)
+    {
+        if (_dragHandle == -1) return Cursors.SizeAll;
+        int h = _dragHandle >= 0 ? _dragHandle : HandleAt(p);
+        if (h >= 100) return Cursors.Hand;
+        switch (h)
+        {
+            case 0: case 4: return Cursors.SizeNWSE;
+            case 2: case 6: return Cursors.SizeNESW;
+            case 1: case 5: return Cursors.SizeNS;
+            case 3: case 7: return Cursors.SizeWE;
+        }
+        if (_editing != null && _editing.Box.Contains(ToImage(p))) return Cursors.IBeam;
+        return AnnotAt(ToImage(p)) >= 0 ? Cursors.SizeAll : Cursors.Default;
     }
 
     private Annot MakeDraft(PointF to, bool shift)
@@ -1259,7 +1633,10 @@ internal sealed class EditorForm : Form
         g.PixelOffsetMode = PixelOffsetMode.Half;
         var visible = new List<Annot>(Current.Count + 2);
         for (int i = 0; i < Current.Count; i++)
-            if (i != _editIndex || _editing == null) visible.Add(Current[i]);
+        {
+            if (i == _editIndex && _editing != null) continue;
+            visible.Add(i == _selected && _preview != null ? _preview : Current[i]); // mid-drag shape shows where it's going
+        }
         if (_draft != null) visible.Add(_draft);
         if (_editing != null) visible.Add(_editing);
         Annot.DrawAll(g, visible);
@@ -1275,6 +1652,13 @@ internal sealed class EditorForm : Form
         if (s_tool == Tool.Crop) PaintCropOverlay(g, view);
         g.Restore(state);
 
+        if (s_tool == Tool.Select && _editing == null && (_preview ?? SelectedAnnot) is Annot sel)
+        {
+            g.SetClip(canvas);
+            PaintSelection(g, sel);
+            g.ResetClip();
+        }
+
         if (_editing != null) // dashed frame around the text being typed, in screen pixels
         {
             var b = ToClient(_editing.Box);
@@ -1284,6 +1668,39 @@ internal sealed class EditorForm : Form
 
         PaintToolbar(g);
         if (_toast != null) PaintToast(g);
+    }
+
+    /// <summary>Select tool: dashed frame and handles around the selected annotation, in screen pixels.</summary>
+    private void PaintSelection(Graphics g, Annot a)
+    {
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        if (a.Frame is RectangleF f)
+        {
+            var fc = ToClient(f);
+            fc.Inflate(2, 2);
+            using (var under = new Pen(Color.FromArgb(140, 0, 0, 0), 1f))
+                g.DrawRectangle(under, fc.X, fc.Y, fc.Width, fc.Height);
+            using (var dash = new Pen(Color.White, 1f) { DashStyle = DashStyle.Dash })
+                g.DrawRectangle(dash, fc.X, fc.Y, fc.Width, fc.Height);
+        }
+
+        float hs = 9 * _s;
+        using var fill = new SolidBrush(Color.White);
+        using var edge = new Pen(Accent, 1.6f * _s);
+        if (a.Resizable && a.Frame is RectangleF rf)
+            foreach (var p in FrameHandles(rf))
+            {
+                var c = ToClient(p);
+                g.FillRectangle(fill, c.X - hs / 2, c.Y - hs / 2, hs, hs);
+                g.DrawRectangle(edge, c.X - hs / 2, c.Y - hs / 2, hs, hs);
+            }
+        foreach (var p in a.PointHandles)
+        {
+            var c = ToClient(p);
+            g.FillEllipse(fill, c.X - hs / 2, c.Y - hs / 2, hs, hs);
+            g.DrawEllipse(edge, c.X - hs / 2, c.Y - hs / 2, hs, hs);
+        }
+        g.SmoothingMode = SmoothingMode.None;
     }
 
     /// <summary>Crop mode: dim everything outside the crop, frame it, show its size.</summary>
