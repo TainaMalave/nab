@@ -1,11 +1,11 @@
-# Snapshot (prototype v7)
+# Snapshot (prototype v8)
 
-A tiny CleanShot-style screenshot tool for Windows 10/11. It's one small `Snapshot.exe` (about 90 KB) built for .NET Framework 4.8, which ships with Windows 10 (1903+) and 11, so there's nothing to install. `Snapshot.exe.config` is optional: the exe runs without it.
+A tiny CleanShot-style screenshot tool for Windows 10/11. It's one small `Snapshot.exe` (about 150 KB) built for .NET Framework 4.8, which ships with Windows 10 (1903+) and 11, so there's nothing to install. `Snapshot.exe.config` is optional: the exe runs without it.
 
 ## Run
 1. Double-click `Snapshot.exe`. If SmartScreen shows "Windows protected your PC" (the exe is unsigned), click **More info**, then **Run anyway**.
 2. A blue icon appears in the system tray (it may be under the `^` overflow arrow). No window opens.
-3. To quit, right-click the tray icon and choose **Exit**. To remove it, delete the exe. It writes no settings or registry entries (only your screenshots in `Pictures\Snapshots` and a small log in `%LOCALAPPDATA%\Snapshot`).
+3. To quit, right-click the tray icon and choose **Exit**. To remove it, delete the exe. It writes no registry entries; besides your screenshots in `Pictures\Snapshots`, it keeps a small log and the editor's last-used settings (`capture.log`, `editor.ini`) in `%LOCALAPPDATA%\Snapshot`.
 
 ## Hotkeys
 | Action | Hotkey | Fallback if another app owns it |
@@ -31,20 +31,24 @@ The screen freezes and dims across all monitors. Drag a rectangle (the live size
   * **Drag the thumbnail** into Slack, Discord, an email, a browser upload box, or an Explorer folder to drop the PNG file there.
   * New captures stack upward. If the stack gets too tall, the oldest is removed.
 
-## Annotation editor (new in v7)
+## Annotation editor (v7, more tools in v8)
 Opens on the monitor the screenshot came from, at 100% if it fits, otherwise zoomed to fit.
 
 | Tool | Key | Notes |
 |---|---|---|
-| Arrow | **A** | Drag. Hold **Shift** to snap to 45°. |
-| Rectangle | **R** | Drag. Hold **Shift** for a square. |
-| Ellipse | **E** | Drag. Hold **Shift** for a circle. |
-| Text | **T** | Click and type. **Enter** = new line, **Esc** or click elsewhere = finish. Click existing text to edit it. |
+| Arrow | **A** | Drag. Hold **Shift** to snap to 45°. Press **F** for **curved** arrows: the curve follows the arc you drag (a straight drag gets a gentle bend). |
+| Rectangle | **R** | Drag. Hold **Shift** for a square. **F** = filled. |
+| Ellipse | **E** | Drag. Hold **Shift** for a circle. **F** = filled. |
+| Highlighter | **H** | See-through marker. Drag freehand, or hold **Shift** for a straight line. |
+| Text | **T** | Click and type. **Enter** = new line, **Esc** or click elsewhere = finish. Click existing text to edit it. **F** = coloured background. |
+| Numbered steps | **N** | Click to drop 1, 2, 3… (hold and drag to position). Numbers re-flow if you undo one. |
+| Blur | **B** | Drag over private details. **F** switches to **pixelate**. Baked into the saved file, so it can't be undone by whoever receives it. |
+| Crop | **C** | Shows the whole picture with the current crop. Drag the area to keep. **Esc**, **Enter** or **C** leaves crop mode; **Ctrl+Z** undoes a crop. |
 
-* **Size:** three choices (keys **1**, **2**, **3**). Sets line thickness, or font size for text.
-* **Fill (F):** filled rectangles/ellipses, or a coloured background behind text (on by default for text, so it reads on busy screenshots).
+* **Size:** three choices (keys **1**, **2**, **3**). Sets line thickness, font size, marker width, step size, or blur strength.
+* **F toggle:** the button next to the sizes; what it does depends on the tool (see the table).
 * **Colours:** red, yellow, green, blue, black, white, plus a custom colour picker. Changing colour, size, or fill while typing restyles that text.
-* The editor remembers your last tool, colour, size, and fill until Snapshot exits.
+* The editor remembers your last tool, colours, size, and toggles, even after Snapshot restarts (saved in `%LOCALAPPDATA%\Snapshot\editor.ini`).
 * **Undo / redo:** Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z).
 * **Zoom:** Ctrl+mouse wheel, Ctrl+plus/minus, **Ctrl+1** = 100%, **Ctrl+0** = fit. Click the % in the toolbar to switch between them. Scroll with the wheel (Shift+wheel sideways); pan with the middle mouse button or **Space**+drag.
 * **Copy** (Ctrl+C) copies the annotated image.
@@ -52,7 +56,7 @@ Opens on the monitor the screenshot came from, at 100% if it fits, otherwise zoo
 * **Save As** (Ctrl+Shift+S) writes a new PNG or JPG and leaves the original alone.
 * **Done** (Ctrl+Enter) saves over the original if anything changed, copies, and closes.
 * Closing with unsaved changes asks first. Exiting Snapshot from the tray also asks for each open editor.
-* On a narrow window (like a portrait monitor) the toolbar wraps onto two rows.
+* On a narrow window (like a portrait monitor) the toolbar wraps onto extra rows.
 
 To open the editor automatically after every capture (instead of showing the thumbnail), open `Snapshot.exe.config` in Notepad, set `OpenEditorAfterCapture` to `true`, and restart Snapshot. It's off by default.
 
@@ -98,7 +102,8 @@ DPI: Per-Monitor V2 is requested in `app.manifest`, with a `SetProcessDpiAwarene
 * `RegionOverlay.cs`: frozen and dimmed selection overlay
 * `ThumbnailForm.cs`: the non-activating floating preview, with hand-painted buttons and OLE file drag
 * `EditorForm.cs`: the annotation editor window (hand-painted toolbar, zoom/pan, text typing, undo, copy/save)
-* `Annotations.cs`: the annotation shapes (arrow, rectangle/ellipse, text) and how they draw
+* `Annotations.cs`: the annotation shapes (arrow, rectangle/ellipse, highlighter, numbered step, blur/pixelate, text) and how they draw
+* `EditorSettings.cs`: remembers the editor's last tool, colours, size and toggles in `editor.ini`
 * `ScreenCapture.cs`: screen grab, PNG save, clipboard
 * `CaptureLog.cs`: the diagnostic log
 * `HdrCapture.cs`: HDR monitors: DXGI Desktop Duplication (FP16) plus tone mapping to sRGB, with SDR white level from DisplayConfig
