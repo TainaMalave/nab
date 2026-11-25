@@ -113,3 +113,10 @@ DPI: Per-Monitor V2 is requested in `app.manifest`, with a `SetProcessDpiAwarene
 * `CaptureLog.cs`: the diagnostic log
 * `HdrCapture.cs`: HDR monitors: DXGI Desktop Duplication (FP16) plus tone mapping to sRGB, with SDR white level from DisplayConfig
 * `Native.cs`: Win32 P/Invoke
+
+## License
+Copyright (C) 2026 Taina Malave
+
+nab is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 3 of the License or (at your option) any later version.
+
+nab is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU General Public License](LICENSE) for more details.
