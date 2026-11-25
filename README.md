@@ -1,124 +1,232 @@
-# nab 0.9.1
+<div align="center">
+
+<img src="images/nab-exe-logo.png" alt="nab app icon: a raccoon holding a screenshot" width="128">
+
+# nab.
 
 **See it. Nab it.**
 
-(Formerly called Snapshot.)
+A tiny, fast screenshot tool for Windows, with a built-in editor for arrows, text, highlights, numbered steps, blur and crop.
 
-A tiny CleanShot-style screenshot tool for Windows 10/11. It's one small `nab.exe` (about 400 KB) built for .NET Framework 4.8, which ships with Windows 10 (1903+) and 11, so there's nothing to install. `nab.exe.config` is optional: the exe runs without it.
+[![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)](#requirements)
+[![.NET Framework 4.8](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4?logo=dotnet&logoColor=white)](#building-from-source)
+[![C#](https://img.shields.io/badge/C%23-WinForms-239120)](#building-from-source)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 
-## Run
-1. Double-click `nab.exe`. If SmartScreen shows "Windows protected your PC" (the exe is unsigned), click **More info**, then **Run anyway**.
-2. A purple raccoon icon appears in the system tray (it may be under the `^` overflow arrow). No window opens.
-3. To quit, right-click the tray icon and choose **Exit**. To remove it, delete the exe. It writes no registry entries; besides your screenshots in `Pictures\nab`, it keeps a small log and the editor's last-used settings (`capture.log`, `editor.ini`) in `%LOCALAPPDATA%\nab`. Images dragged out of the editor are temporary copies in `%TEMP%\nab`, cleared after a day.
-4. Upgrading from Snapshot: exit the old Snapshot from its tray icon first (nab tells you if it's still running). Screenshots taken before the rename stay in `Pictures\Snapshots`; the editor picks up your old settings automatically.
+[Download](#installation) · [Features](#features) · [Keyboard shortcuts](#keyboard-shortcuts) · [Build from source](#building-from-source)
 
-## Hotkeys
-| Action | Hotkey | Fallback if another app owns it |
+<br>
+
+<img src="images/mockup-images/nab-readme-hero.png" alt="Before and after: a code editor screenshot, then the same screenshot in nab's editor with arrows, a highlight box and blurred text" width="900">
+
+</div>
+
+## Features
+
+- **Instant capture.** Grab a region or a whole monitor with one hotkey. The image is saved and copied to your clipboard right away.
+- **Floating quick actions.** A small thumbnail pops up after every capture with Edit, Copy, Save As and Folder buttons.
+- **Annotations.** Arrows (straight or curved), rectangles, ellipses, highlighter, text and numbered steps, in six colours plus any custom colour.
+- **Blur and pixelate.** Hide passwords, emails and other private details. The blur is baked into the saved image, so it can't be undone.
+- **Crop and edit later.** Crop to just the part that matters, then move, resize or restyle anything you drew.
+- **Drag-and-drop sharing.** Drag a screenshot straight into Slack, Discord, an email or a browser upload box.
+- **HDR support.** Screenshots from HDR monitors come out with normal colours instead of washed out.
+- **Small and portable.** One ~400 KB exe. No installer, no account, no internet connection.
+
+## Capture in seconds
+
+Press **Ctrl+Shift+2**, drag over what you want, and let go. The screen freezes while you pick, so menus and tooltips stay put. Your screenshot is saved to `Pictures\nab` and copied to the clipboard, ready to paste.
+
+<p align="center">
+  <img src="images/mockup-images/capture-workflow-readme.gif" alt="Selecting a region of the screen with nab and the floating thumbnail appearing" width="800">
+</p>
+
+## Edit and annotate
+
+Click **Edit** on the thumbnail (or double-click it) to open the editor. Point things out with arrows, box them in, highlight a line or number the steps. Everything you draw stays editable until you save: click a shape to move it, resize it or change its colour.
+
+<p align="center">
+  <img src="images/mockup-images/shapes-and-annotations-readme.gif" alt="Drawing arrows, boxes, text and numbered steps in the nab editor" width="800">
+</p>
+
+## Protect sensitive information
+
+Drag the blur tool over anything private. Press **F** to switch between a soft blur and a pixelated look. The blur is part of the saved image, so whoever receives it can't remove it.
+
+<p align="center">
+  <img src="images/mockup-images/privacy-blur-readme.gif" alt="Blurring private text in a screenshot with the nab blur tool" width="800">
+</p>
+
+## Quick actions
+
+After every capture, a thumbnail floats in the bottom-right corner. Hover over it to **Edit**, **Copy**, **Save As** (PNG or JPG) or open the **Folder**, or drag the thumbnail itself into another app to share the file. It never steals focus, so you can keep typing, and it disappears after a few seconds (hovering keeps it open).
+
+<p align="center">
+  <img src="images/mockup-images/nab-floatingThumbnail.png" alt="The floating thumbnail with Edit, Copy, Save As and Folder buttons" width="800">
+</p>
+
+<p align="center">
+  <img src="images/mockup-images/nab-annotated-thumbnail.png" alt="The nab editor with numbered callouts and a blurred section, next to the floating thumbnail" width="800">
+</p>
+
+## Installation
+
+### Requirements
+
+- Windows 10 (version 1903 or later) or Windows 11
+- .NET Framework 4.8, which is already built into these versions of Windows
+
+### Download and run
+
+1. Download the latest `nab-X.Y.Z.zip` from the [Releases](https://github.com/TainaMalave/nab/releases) page.
+2. Unzip it somewhere permanent, such as `Documents\nab`.
+3. Double-click `nab.exe`. A raccoon icon appears in the system tray (check the `^` overflow arrow), and no window opens. That's it: nab is ready.
+
+> [!NOTE]
+> nab isn't code-signed yet, so Windows may show **"Windows protected your PC"** the first time. Click **More info**, then **Run anyway**. You can also right-click the zip before unzipping, choose **Properties**, and tick **Unblock**.
+
+### Tips
+
+- **Desktop shortcut:** right-click `nab.exe` → **Show more options** → **Send to** → **Desktop (create shortcut)**.
+- **Start with Windows:** press **Win+R**, type `shell:startup`, and put a shortcut to `nab.exe` in the folder that opens.
+- **Quit:** right-click the tray icon → **Exit**.
+
+### Uninstall
+
+Exit nab from the tray and delete its folder. nab doesn't write to the registry. If you want to remove everything, also delete `%LOCALAPPDATA%\nab` (settings and log). Your screenshots in `Pictures\nab` are yours to keep.
+
+## Keyboard shortcuts
+
+### Capturing (work anywhere)
+
+| Action | Shortcut | Backup shortcut |
 |---|---|---|
-| Capture region | **Ctrl+Shift+2** | Ctrl+Alt+Shift+2 |
-| Capture full screen (monitor under the mouse) | **Ctrl+Shift+1** | Ctrl+Alt+Shift+1 |
+| Capture a region | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd> |
+| Capture the monitor under the mouse | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd> |
+| Cancel a region capture | <kbd>Esc</kbd> or right-click | |
 
-The startup notification and the tray menu show which hotkeys were actually registered.
-Left-clicking the tray icon also starts a region capture.
-Note: while nab runs, these hotkeys are global, so Excel's Ctrl+Shift+1 and Ctrl+Shift+2 number-format shortcuts won't reach Excel.
+If another app already uses a shortcut, nab switches to the backup one. The startup message and the tray menu show which shortcuts are active. You can also left-click the tray icon to capture a region.
 
-## Region capture
-The screen freezes and dims across all monitors. Drag a rectangle (the live size shows in pixels).
-**Esc** or **right-click** cancels.
+### Editor tools
 
-## After every capture
-* The image is copied to the clipboard (as a bitmap and as PNG).
-* A PNG is saved to `Pictures\nab\nab YYYY-MM-DD at HH.MM.SS.png`.
-* A **floating thumbnail** appears at the bottom-right. It never takes focus, so you can keep typing.
-  * It disappears after about 6 seconds. Hovering keeps it open.
-  * On hover you get **Edit**, **Copy**, **Save As** (PNG or JPG), **Folder** (opens Explorer with the file selected), and **✕**.
-  * **Double-click** the thumbnail (or click **Edit**) to open the annotation editor.
-  * **Drag the thumbnail** into Slack, Discord, an email, a browser upload box, or an Explorer folder to drop the PNG file there.
-  * New captures stack upward. If the stack gets too tall, the oldest is removed.
-
-## Annotation editor (v7, more tools in v8, editing and drag-out in v9)
-Opens on the monitor the screenshot came from, at 100% if it fits, otherwise zoomed to fit.
-
-| Tool | Key | Notes |
+| Tool | Key | How to use it |
 |---|---|---|
-| Select | **V** | Click a shape to select it, then drag to move it. Rectangles, ellipses, blurs and highlighter strokes get 8 resize handles. Arrows get a handle at each end plus one in the middle: drag the middle to bend the arrow (back to the line makes it straight). **Arrow keys** nudge (Shift = 10 px), **Delete** removes, **double-click** text to edit it, **Esc** deselects. Changing colour, size or the F toggle restyles the selected shape. |
-| Arrow | **A** | Drag. Hold **Shift** to snap to 45°. Press **F** for **curved** arrows: the curve follows the arc you drag (a straight drag gets a gentle bend). |
-| Rectangle | **R** | Drag. Hold **Shift** for a square. **F** = filled. |
-| Ellipse | **E** | Drag. Hold **Shift** for a circle. **F** = filled. |
-| Highlighter | **H** | See-through marker. Drag freehand, or hold **Shift** for a straight line. |
-| Text | **T** | Click and type. **Enter** = new line, **Esc** or click elsewhere = finish. Click existing text to edit it. **F** = coloured background. |
-| Numbered steps | **N** | Click to drop 1, 2, 3… (hold and drag to position). Numbers re-flow if you undo one. |
-| Blur | **B** | Drag over private details. **F** switches to **pixelate**. Baked into the saved file, so it can't be undone by whoever receives it. |
-| Crop | **C** | Shows the whole picture with the current crop. Drag the area to keep. **Esc**, **Enter** or **C** leaves crop mode; **Ctrl+Z** undoes a crop. |
+| Select | <kbd>V</kbd> | Click a shape to select it, then drag to move it or drag its handles to resize. Drag the middle handle of an arrow to bend it. |
+| Arrow | <kbd>A</kbd> | Drag. Hold <kbd>Shift</kbd> to snap to 45°. <kbd>F</kbd> switches to curved arrows. |
+| Rectangle | <kbd>R</kbd> | Drag. Hold <kbd>Shift</kbd> for a square. <kbd>F</kbd> = filled. |
+| Ellipse | <kbd>E</kbd> | Drag. Hold <kbd>Shift</kbd> for a circle. <kbd>F</kbd> = filled. |
+| Highlighter | <kbd>H</kbd> | Drag freehand, or hold <kbd>Shift</kbd> for a straight line. |
+| Text | <kbd>T</kbd> | Click and type. <kbd>Enter</kbd> starts a new line. <kbd>F</kbd> adds a coloured background. |
+| Numbered steps | <kbd>N</kbd> | Click to drop 1, 2, 3… Numbers renumber themselves if you remove one. |
+| Blur | <kbd>B</kbd> | Drag over private details. <kbd>F</kbd> switches to pixelate. |
+| Crop | <kbd>C</kbd> | Drag the area to keep. <kbd>Enter</kbd>, <kbd>Esc</kbd> or <kbd>C</kbd> finishes. |
 
-* **Size:** three choices (keys **1**, **2**, **3**). Sets line thickness, font size, marker width, step size, or blur strength.
-* **F toggle:** the button next to the sizes; what it does depends on the tool (see the table).
-* **Colours:** red, yellow, green, blue, black, white, plus a custom colour picker. Changing colour, size, or fill while typing restyles that text.
-* The editor remembers your last tool, colours, size, and toggles, even after nab restarts (saved in `%LOCALAPPDATA%\nab\editor.ini`).
-* **Undo / redo:** Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z).
-* **Zoom:** Ctrl+mouse wheel, Ctrl+plus/minus, **Ctrl+1** = 100%, **Ctrl+0** = fit. Click the % in the toolbar to switch between them. Scroll with the wheel (Shift+wheel sideways); pan with the middle mouse button or **Space**+drag.
-* **Drag** (the toolbar button with the dots): drag it onto Slack, Discord, an email, a browser upload box or a folder to drop the annotated image as a PNG, like the thumbnail. If nothing changed since the last save it drops the original file; otherwise a copy with the same name.
-* **Copy** (Ctrl+C) copies the annotated image.
-* **Save** (Ctrl+S) saves over the original PNG in `Pictures\nab`.
-* **Save As** (Ctrl+Shift+S) writes a new PNG or JPG and leaves the original alone.
-* **Done** (Ctrl+Enter) saves over the original if anything changed, copies, and closes.
-* Closing with unsaved changes asks first. Exiting nab from the tray also asks for each open editor.
-* On a narrow window (like a portrait monitor) the toolbar wraps onto extra rows.
+### Editor actions
 
-To open the editor automatically after every capture (instead of showing the thumbnail), open `nab.exe.config` in Notepad, set `OpenEditorAfterCapture` to `true`, and restart nab. It's off by default.
+| Action | Shortcut |
+|---|---|
+| Size small / medium / large | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> |
+| Toggle the tool's option (curved, filled, background, pixelate) | <kbd>F</kbd> |
+| Undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
+| Move the selected shape | Arrow keys (hold <kbd>Shift</kbd> for bigger steps) |
+| Delete the selected shape | <kbd>Delete</kbd> |
+| Copy the image | <kbd>Ctrl</kbd>+<kbd>C</kbd> |
+| Save over the original | <kbd>Ctrl</kbd>+<kbd>S</kbd> |
+| Save as a new PNG or JPG | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> |
+| Done (save, copy and close) | <kbd>Ctrl</kbd>+<kbd>Enter</kbd> |
+| Zoom in / out | <kbd>Ctrl</kbd>+mouse wheel or <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> |
+| Zoom to 100% / fit to window | <kbd>Ctrl</kbd>+<kbd>1</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd> |
+| Pan | Middle mouse button, or hold <kbd>Space</kbd> and drag |
 
-## HDR displays (new in v3)
-With Windows HDR turned on, the classic GDI screen grab returns the desktop without tone mapping, so games (World of Warcraft, etc.) came out blown out and washed out.
-v3 detects which monitors are in HDR mode and captures those through DXGI Desktop Duplication in 16-bit floating-point (scRGB). It then tone-maps the image to normal 8-bit sRGB:
-* Windows' **SDR content brightness** setting maps to white, the same conversion Snipping Tool uses. Everything at or below that brightness is left exactly as-is, so contrast and saturation match Snipping Tool.
-* v4 handles colors brighter than SDR white two ways:
-  * The default (`hue`) scales them down without changing their hue, so a bright orange torch stays orange.
-  * `clip` cuts each channel off at white, exactly like Snipping Tool. To use it, open `nab.exe.config` in Notepad, change `HdrToneMap` from `hue` to `clip`, and restart nab.
-* **HdrBrightness** (default `1.10`) makes HDR captures a little brighter than the v5 look. It only applies on HDR monitors, after converting by Windows' SDR white level and before the hue/clip step, so highlights still keep their colour instead of going flat white. Open `nab.exe.config` in Notepad to change it, then restart nab. `1.0` is exactly how v5 looked, `1.10` is the default (about 10% brighter), `1.2` is a bit brighter still. Values are limited to 0.5–2.0.
-* Monitors in SDR mode still use the GDI path, unchanged.
-* If anything in the HDR path fails (an old driver, a rotated or portrait HDR monitor, a protected window, etc.), that monitor falls back to the old capture, so nothing gets worse.
+The editor remembers your last tool, colour and size, even after a restart. To share an edited screenshot without saving it, drag the **Drag** button in the toolbar into another app.
 
-## v6
-HDR captures are slightly brighter by default (`HdrBrightness=1.10` in `nab.exe.config`). Set it to `1.0` to get the v5 look, or a little higher (for example `1.2`) if you want more. SDR monitors are unchanged.
+## Settings
 
-## v5
-v3 and v4 never actually used the HDR path. A COM call that fills in the monitor description failed on every monitor (`MarshalDirectiveException`: a pointer to a struct the runtime could not pass through as raw memory), so every capture fell back to the old GDI method. v5 fixes that struct (Windows wide strings are stored as 16-bit numbers, not C# `char`, which the runtime otherwise tries to recode) and passes every native struct as a raw pointer. The capture log now names the exact COM method if something throws, and records a one-line struct-size self-check.
+Open `nab.exe.config` (next to `nab.exe`) in Notepad, change a value, and restart nab.
 
-**Diagnostics:** every capture appends a few lines to `%LOCALAPPDATA%\nab\capture.log`. Tray menu → **Open capture log**. It shows:
-* each monitor, with its coordinates, color space, and whether it's HDR
-* the SDR white level
-* whether HDR capture worked, and if not, why it fell back
-* the brightest value in the frame
-* how much of the screenshot came from the HDR path
+| Setting | Default | What it does |
+|---|---|---|
+| `OpenEditorAfterCapture` | `false` | `true` opens the editor right after every capture instead of showing the thumbnail. |
+| `HdrToneMap` | `hue` | How very bright HDR colours are brought into range. `hue` keeps their colour; `clip` matches Windows Snipping Tool. |
+| `HdrBrightness` | `1.10` | Brightness of screenshots from HDR monitors (0.5 to 2.0). |
 
-Expect the HDR capture to look a little less punchy than what you see on the HDR monitor. That's normal: a PNG is an SDR image.
-Exclusive-fullscreen games can block or confuse desktop capture. If that happens, switch the game to borderless/windowed fullscreen.
+## Where your files go
 
-## Build (from Linux or Windows)
+| What | Where |
+|---|---|
+| Screenshots | `Pictures\nab\nab YYYY-MM-DD at HH.MM.SS.png` |
+| Editor settings and capture log | `%LOCALAPPDATA%\nab` |
+| Temporary copies from dragging an edited image | `%TEMP%\nab` (cleared after a day) |
+
+nab works completely offline. It never connects to the internet and collects no data.
+
+## Troubleshooting
+
+<details>
+<summary><b>Screenshots from my HDR monitor look washed out or too dark</b></summary>
+
+nab captures HDR monitors in high precision and converts them to a normal image, using the same white level as Windows' **SDR content brightness** setting. A saved PNG will always look a little less punchy than HDR on screen. Try adjusting `HdrBrightness` in [Settings](#settings). For details on what happened during a capture, right-click the tray icon → **Open capture log**.
+</details>
+
+<details>
+<summary><b>A game screenshot comes out black or wrong</b></summary>
+
+Exclusive-fullscreen games can block screen capture. Switch the game to borderless or windowed fullscreen.
+</details>
+
+<details>
+<summary><b>Excel's Ctrl+Shift+1 / Ctrl+Shift+2 shortcuts stopped working</b></summary>
+
+While nab is running, it owns those shortcuts, so they don't reach Excel. Exit nab from the tray when you need them.
+</details>
+
+<details>
+<summary><b>"nab is already running"</b></summary>
+
+Only one copy of nab runs at a time. Look for the raccoon icon in the system tray, including under the `^` overflow arrow.
+</details>
+
+## Building from source
+
+You need the [.NET SDK](https://dotnet.microsoft.com/download) (version 8 or newer). It builds the .NET Framework 4.8 app using reference assemblies from NuGet, so Visual Studio isn't required.
+
+```bash
+git clone https://github.com/TainaMalave/nab.git
+cd nab
+dotnet build -c Release -o out
 ```
-dotnet build -c Release -o out      # .NET SDK; reference assemblies come from NuGet
-```
-Output: `out/nab.exe` (AnyCPU, runs 64-bit on x64). It only references Framework assemblies in the GAC (mscorlib, System, System.Core, System.Configuration, System.Drawing, System.Windows.Forms).
-DPI: Per-Monitor V2 is requested in `app.manifest`, with a `SetProcessDpiAwarenessContext` fallback in `Program.Main`.
 
-## Code map
-* `Program.cs`: single-instance mutex and DPI fallback
-* `GlobalUsings.cs`: shared using directives
-* `TrayApp.cs`: tray icon and menu, hotkeys, capture flow, thumbnail stacking
-* `HotkeyWindow.cs`: message-only window plus `RegisterHotKey`
-* `RegionOverlay.cs`: frozen and dimmed selection overlay
-* `ThumbnailForm.cs`: the non-activating floating preview, with hand-painted buttons and OLE file drag
-* `EditorForm.cs`: the annotation editor window (hand-painted toolbar, zoom/pan, text typing, undo, copy/save)
-* `Annotations.cs`: the annotation shapes (arrow, rectangle/ellipse, highlighter, numbered step, blur/pixelate, text) and how they draw
-* `EditorSettings.cs`: remembers the editor's last tool, colours, size and toggles in `editor.ini`
-* `ScreenCapture.cs`: screen grab, PNG save, clipboard
-* `CaptureLog.cs`: the diagnostic log
-* `HdrCapture.cs`: HDR monitors: DXGI Desktop Duplication (FP16) plus tone mapping to sRGB, with SDR white level from DisplayConfig
-* `Native.cs`: Win32 P/Invoke
+The app is built to `out/nab.exe`. It only uses libraries that come with Windows, so there are no other dependencies.
+
+<details>
+<summary><b>Project structure</b></summary>
+
+| File | What it does |
+|---|---|
+| `Program.cs` | Startup, single-instance check and DPI setup |
+| `TrayApp.cs` | Tray icon and menu, hotkeys, capture flow, thumbnail stacking |
+| `HotkeyWindow.cs` | Registers the global hotkeys |
+| `RegionOverlay.cs` | The frozen, dimmed screen for picking a region |
+| `ThumbnailForm.cs` | The floating thumbnail, its buttons and drag-to-share |
+| `EditorForm.cs` | The editor window: toolbar, zoom and pan, text typing, undo, copy and save |
+| `Annotations.cs` | The shapes (arrow, rectangle, ellipse, highlighter, step, blur, text) and how they draw |
+| `EditorSettings.cs` | Remembers the editor's last tool, colours and size |
+| `ScreenCapture.cs` | Screen grab, PNG saving and clipboard |
+| `HdrCapture.cs` | HDR capture with DXGI Desktop Duplication and tone mapping to sRGB |
+| `CaptureLog.cs` | The diagnostic capture log |
+| `Native.cs` | Windows API declarations |
+
+</details>
+
+## Contributing
+
+Found a bug or have an idea? [Open an issue](https://github.com/TainaMalave/nab/issues). Please include your Windows version and, for capture problems, the relevant lines from the capture log.
 
 ## License
+
 Copyright (C) 2026 Taina Malave
 
 nab is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 3 of the License or (at your option) any later version.
 
 nab is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU General Public License](LICENSE) for more details.
+
+<p align="center"><b>Just nab it.</b> 🦝</p>
