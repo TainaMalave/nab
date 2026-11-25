@@ -1,5 +1,7 @@
 # nab 0.9.1
 
+**See it. Nab it.**
+
 (Formerly called Snapshot.)
 
 A tiny CleanShot-style screenshot tool for Windows 10/11. It's one small `nab.exe` (about 400 KB) built for .NET Framework 4.8, which ships with Windows 10 (1903+) and 11, so there's nothing to install. `nab.exe.config` is optional: the exe runs without it.
